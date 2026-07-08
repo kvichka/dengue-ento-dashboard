@@ -1,0 +1,1769 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CHAI Battambang — Entomological Surveillance Dashboard</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.5.1" crossorigin="anonymous"></script>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin=""/>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
+<style>
+:root{
+  --blue:#1A3A5C;--sky:#2563EB;--teal:#0D9488;--amber:#D97706;--green:#16A34A;
+  --red:#E8563A;--orange:#F5923A;--yellow:#FBCA4A;--teal-light:#6DCBBE;--grey:#64748B;--white:#fff;--off:#F1F5F9;--card:#fff;
+  --shadow:0 2px 12px rgba(0,0,0,.08),0 1px 3px rgba(0,0,0,.06);
+  --radius:12px;--gap:16px;
+  --grad-blue:linear-gradient(135deg,#1A3A5C 0%,#2563EB 100%);
+  --grad-teal:linear-gradient(135deg,#0D9488 0%,#0891B2 100%);
+  --grad-amber:linear-gradient(135deg,#D97706 0%,#EA580C 100%);
+  --grad-green:linear-gradient(135deg,#16A34A 0%,#0D9488 100%);
+  --grad-red:linear-gradient(135deg,#DC2626 0%,#DB2777 100%);
+  --grad-purple:linear-gradient(135deg,#7C3AED 0%,#2563EB 100%);
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'Segoe UI',Arial,sans-serif;background:#EFF6FF;color:#1E293B;font-size:14px}
+.wrap{max-width:1400px;margin:0 auto;padding:16px}
+
+/* HEADER */
+.hdr{background:var(--grad-blue);color:#fff;border-radius:var(--radius);padding:16px 22px;
+  display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px;
+  margin-bottom:var(--gap)}
+.hdr h1{font-size:18px;font-weight:700}
+.hdr p{font-size:12px;color:#A9CCE3;margin-top:2px}
+.gs-row{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.gs-input{padding:6px 10px;border:1px solid rgba(255,255,255,.3);border-radius:6px;
+  background:rgba(255,255,255,.12);color:#fff;font-size:12px;width:340px}
+.gs-input::placeholder{color:rgba(255,255,255,.5)}
+.btn{padding:7px 14px;border:none;border-radius:6px;cursor:pointer;font-size:12px;font-weight:600}
+.btn-load{background:#2ECC71;color:#fff}
+.btn-load:hover{background:#27AE60}
+.btn-sm{background:rgba(255,255,255,.15);color:#fff;border:1px solid rgba(255,255,255,.25)}
+.btn-dl{background:rgba(255,255,255,.12);color:#fff;border:1px solid rgba(255,255,255,.2);padding:5px 12px;font-size:11px;border-radius:6px;cursor:pointer;transition:.2s}
+.btn-dl:hover{background:rgba(255,255,255,.25)}
+.sync-status{font-size:11px;color:#A9CCE3}
+
+/* FILTERS */
+.filters{background:var(--card);border-radius:var(--radius);padding:12px 18px;
+  display:flex;gap:12px;align-items:center;flex-wrap:wrap;margin-bottom:var(--gap);
+  box-shadow:var(--shadow);border:1px solid #E2E8F0}
+.filter-group{display:flex;align-items:center;gap:6px}
+.filter-group label{font-size:12px;color:var(--grey);font-weight:600;white-space:nowrap}
+.filter-group select{padding:5px 10px;border:1px solid #ddd;border-radius:6px;
+  font-size:12px;background:#fff;color:#1A2332;cursor:pointer}
+.filter-group select:focus{outline:none;border-color:var(--sky);background:linear-gradient(to bottom right,#fff,#EFF6FF)}
+.btn-reset{padding:5px 12px;background:var(--off);border:1px solid #ddd;border-radius:6px;
+  font-size:12px;cursor:pointer;color:var(--grey)}
+.btn-reset:hover{background:#e0e0e0}
+
+/* KPI CARDS */
+.kpi-row{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));
+  gap:var(--gap);margin-bottom:var(--gap)}
+.kpi{background:var(--card);border-radius:var(--radius);padding:16px 18px;
+  box-shadow:var(--shadow);border-top:4px solid var(--blue);position:relative;overflow:hidden;
+  transition:transform .15s,box-shadow .15s}
+.kpi:hover{transform:translateY(-2px);box-shadow:0 6px 20px rgba(0,0,0,.12)}
+.kpi-icon{position:absolute;right:14px;top:12px;font-size:24px;opacity:.12}
+.kpi-label{font-size:11px;color:var(--grey);text-transform:uppercase;letter-spacing:.5px;font-weight:600}
+.kpi-val{font-size:28px;font-weight:700;margin:4px 0 2px;color:#1A2332}
+.kpi-sub{font-size:11px;color:var(--grey)}
+.kpi.teal{border-color:var(--teal);background:linear-gradient(to bottom right,#fff,#F0FDFA)}
+.kpi.amber{border-color:var(--amber);background:linear-gradient(to bottom right,#fff,#FFFBEB)}
+.kpi.green{border-color:var(--green);background:linear-gradient(to bottom right,#fff,#F0FDF4)}
+.kpi.red{border-color:var(--red);background:linear-gradient(to bottom right,#fff,#FFF1F2)}
+.kpi.sky{border-color:var(--sky);background:linear-gradient(to bottom right,#fff,#EFF6FF)}
+
+/* CHART GRID */
+.chart-grid{display:grid;grid-template-columns:1fr 1fr;gap:var(--gap);margin-bottom:var(--gap)}
+.chart-grid.three{grid-template-columns:1fr 1fr 1fr}
+.chart-grid.full{grid-template-columns:1fr}
+.chart-box{background:var(--card);border-radius:var(--radius);padding:18px 20px;
+  box-shadow:var(--shadow);border:1px solid #F1F5F9}
+.chart-box h3{font-size:13px;font-weight:700;color:#1A2332;margin-bottom:12px;
+  display:flex;align-items:center;gap:6px}
+.chart-box h3 span{font-size:16px}
+.chart-box canvas{max-height:280px}
+
+/* TABS */
+.tabs{display:flex;gap:6px;margin-bottom:var(--gap);flex-wrap:wrap}
+.tab{padding:8px 16px;border:1px solid #E2E8F0;border-radius:20px;background:#fff;
+  cursor:pointer;font-size:12px;font-weight:600;color:var(--grey);transition:.2s;letter-spacing:.2px}
+.tab.active{background:var(--grad-blue);color:#fff;border-color:transparent;box-shadow:0 2px 8px rgba(37,99,235,.3)}
+.tab:hover:not(.active){background:var(--off)}
+.tab-content{display:none}
+.tab-content.active{display:block}
+
+/* TABLE */
+.tbl-box{background:var(--card);border-radius:var(--radius);padding:18px 20px;
+  box-shadow:var(--shadow);overflow-x:auto}
+.tbl-box h3{font-size:13px;font-weight:700;margin-bottom:12px}
+table{width:100%;border-collapse:collapse;font-size:12px}
+thead th{text-align:left;padding:8px 10px;border-bottom:2px solid #eee;
+  color:var(--grey);font-weight:700;font-size:11px;text-transform:uppercase;
+  letter-spacing:.4px;white-space:nowrap;cursor:pointer;user-select:none}
+thead th:hover{color:#1A2332;background:#f8f9fa}
+tbody td{padding:8px 10px;border-bottom:1px solid #f0f0f0;white-space:nowrap}
+tbody tr:hover{background:#f8f9fa}
+.badge{display:inline-block;padding:2px 8px;border-radius:10px;font-size:11px;font-weight:600}
+.badge-high{background:#FDEBD7;color:#C44028}
+.badge-mid{background:#FEF9E0;color:#B8860B}
+.badge-low{background:#DFF6F0;color:#1A7A6A}
+
+/* WHO ALERT */
+.alert-box{background:#FCE4D6;border-left:4px solid var(--red);border-radius:6px;
+  padding:10px 14px;margin-bottom:var(--gap);font-size:12px;display:none}
+.alert-box.show{display:block}
+
+/* FOOTER */
+footer{text-align:center;font-size:11px;color:var(--grey);padding:16px;margin-top:var(--gap)}
+
+#map { height: 520px; border-radius: 8px; }
+.map-legend { background:#fff; padding:12px 16px; border-radius:8px;
+  box-shadow:var(--shadow); font-size:12px; line-height:1.8; }
+.map-legend-item { display:flex; align-items:center; gap:8px; margin-bottom:4px; }
+.map-dot { width:14px; height:14px; border-radius:50%; flex-shrink:0; border:2px solid rgba(0,0,0,.2); }
+.map-info { background:var(--card); border-radius:var(--radius); padding:14px 18px;
+  box-shadow:var(--shadow); margin-top:var(--gap); font-size:12px; }
+.map-controls { display:flex; gap:8px; margin-bottom:10px; flex-wrap:wrap; }
+.map-ctrl-btn { padding:5px 12px; border:1px solid #ddd; border-radius:16px;
+  background:#fff; cursor:pointer; font-size:11px; font-weight:600; color:var(--grey); transition:.2s; }
+.map-ctrl-btn.active { background:var(--blue); color:#fff; border-color:var(--blue); }
+.map-ctrl-btn:hover:not(.active) { background:var(--off); }
+
+
+@media(max-width:900px){
+  .chart-grid{grid-template-columns:1fr}
+  .chart-grid.three{grid-template-columns:1fr}
+  .kpi-row{grid-template-columns:repeat(2,1fr)}
+}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<!-- HEADER -->
+<div class="hdr">
+  <div>
+    <h1>🦟 CHAI Battambang — Entomological Surveillance Dashboard</h1>
+    <p>Wolbachia Dengue Program · Battambang, Cambodia · v2026.07</p>
+  </div>
+  <div class="gs-row">
+    <!-- Hidden URL inputs -->
+    <input type="hidden" id="gsUrlF1">
+    <input type="hidden" id="gsUrlF2">
+    <input type="hidden" id="gsUrlF3">
+    <button class="btn btn-load" onclick="showLinkModal()">🔗 Set Data Links</button>
+    <button class="btn btn-load" onclick="loadFromGSheets()">🔄 Load Data</button>
+    <button class="btn btn-sm" onclick="useEmbedded()">Use Embedded</button>
+    <span class="sync-status" id="syncStatus">📊 Using embedded data</span>
+  </div>
+
+  <!-- Link Modal -->
+  <div id="linkModal" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;
+    background:rgba(0,0,0,.5);z-index:9999;align-items:center;justify-content:center">
+    <div style="background:#fff;border-radius:12px;padding:28px;width:520px;max-width:95vw;
+      box-shadow:0 20px 60px rgba(0,0,0,.3)">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px">
+        <h3 style="font-size:16px;font-weight:700;color:#1A3A5C">🔗 Set Google Sheets Links</h3>
+        <button onclick="closeLinkModal()" style="background:none;border:none;font-size:20px;
+          cursor:pointer;color:#64748B;line-height:1">×</button>
+      </div>
+      <!-- Form 1 -->
+      <div style="margin-bottom:14px">
+        <label style="font-size:12px;font-weight:600;color:#64748B;display:block;margin-bottom:5px">
+          🏠 Form 1 — HH Register <span style="color:#94A3B8">(optional)</span>
+        </label>
+        <input id="modalUrlF1" type="text" placeholder="Paste Form1_HH_Register CSV URL…"
+          style="width:100%;padding:8px 12px;border:1px solid #E2E8F0;border-radius:8px;
+          font-size:12px;outline:none;box-sizing:border-box">
+        <div style="font-size:10px;color:#94A3B8;margin-top:3px">
+          Publish to web → Form1_HH_Register tab → CSV
+        </div>
+      </div>
+      <!-- Form 2 -->
+      <div style="margin-bottom:14px">
+        <label style="font-size:12px;font-weight:600;color:#64748B;display:block;margin-bottom:5px">
+          🪣 Form 2 — Installation & Container Index <span style="color:#94A3B8">(optional)</span>
+        </label>
+        <input id="modalUrlF2" type="text" placeholder="Paste Form2_Installation CSV URL…"
+          style="width:100%;padding:8px 12px;border:1px solid #E2E8F0;border-radius:8px;
+          font-size:12px;outline:none;box-sizing:border-box">
+        <div style="font-size:10px;color:#94A3B8;margin-top:3px">
+          Publish to web → Form2_Installation tab → CSV
+        </div>
+      </div>
+      <!-- Form 3 -->
+      <div style="margin-bottom:20px">
+        <label style="font-size:12px;font-weight:600;color:#64748B;display:block;margin-bottom:5px">
+          📋 Form 3+4 — Collection & Lab Result <span style="color:#E8563A">*</span>
+        </label>
+        <input id="modalUrlF3" type="text" placeholder="Paste Form3_Collection_Lab CSV URL…"
+          style="width:100%;padding:8px 12px;border:1px solid #E2E8F0;border-radius:8px;
+          font-size:12px;outline:none;box-sizing:border-box">
+        <div style="font-size:10px;color:#94A3B8;margin-top:3px">
+          Publish to web → Form3_Collection_Lab tab → CSV — <strong>required</strong>
+        </div>
+      </div>
+      <div style="display:flex;gap:10px;justify-content:flex-end">
+        <button onclick="closeLinkModal()" style="padding:8px 18px;border:1px solid #E2E8F0;
+          border-radius:8px;background:#fff;font-size:13px;cursor:pointer;color:#64748B">
+          Cancel
+        </button>
+        <button onclick="saveAndLoad()" style="padding:8px 20px;border:none;border-radius:8px;
+          background:linear-gradient(135deg,#1A3A5C,#2563EB);color:#fff;
+          font-size:13px;font-weight:600;cursor:pointer">
+          💾 Save & Load Data
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- FILTERS -->
+<div class="filters">
+  <div class="filter-group"><label>Commune</label>
+    <select id="fCommune" onchange="applyFilters()">
+      <option value="">All Communes</option>
+    </select>
+  </div>
+  <div class="filter-group"><label>Village</label>
+    <select id="fVillage" onchange="applyFilters()">
+      <option value="">All Villages</option>
+    </select>
+  </div>
+  <div class="filter-group"><label>Month</label>
+    <select id="fMonth" onchange="applyFilters()">
+      <option value="">All Months</option>
+    </select>
+  </div>
+  <div class="filter-group"><label>Year</label>
+    <select id="fYear" onchange="applyFilters()">
+      <option value="">All Years</option>
+    </select>
+  </div>
+  <button class="btn-reset" onclick="resetFilters()">✕ Reset</button>
+  <span style="margin-left:auto;font-size:11px;color:var(--grey)" id="recCount"></span>
+</div>
+
+
+<!-- DOWNLOAD BAR -->
+<div class="filters" style="background:var(--grad-blue);gap:10px;border-radius:var(--radius)">
+  <span style="color:#A9CCE3;font-size:12px;font-weight:600">📥 Download Data:</span>
+  <button class="btn btn-dl" onclick="downloadCSV('f3')">📋 Lab Result</button>
+  <button class="btn btn-dl" onclick="downloadCSV('f2')">🪣 Installation</button>
+  <button class="btn btn-dl" onclick="downloadCSV('f1')">🏠 HH Register</button>
+  <button class="btn btn-dl" onclick="downloadCSV('all')">💾 All Forms Combined</button>
+  <span style="margin-left:auto;font-size:11px;color:#A9CCE3">Current filter applied to download</span>
+</div>
+
+
+<!-- TABS -->
+<div class="tabs">
+  <div class="tab active" onclick="switchTab('overview')">📊 Overview</div>
+  <div class="tab" onclick="switchTab('larval')">🔬 Larval & CI</div>
+  <div class="tab" onclick="switchTab('prokopack')">🦟 Prokopack</div>
+  <div class="tab" onclick="switchTab('bg')">🕷️ BG-Sentinel</div>
+  <div class="tab" onclick="switchTab('ovitrap')">🪤 Ovitrap</div>
+  <div class="tab" onclick="switchTab('container')">🪣 Container Index</div>
+  <div class="tab" onclick="switchTab('map')" id="tab-btn-map">🗺️ Map</div>
+  <div class="tab" onclick="switchTab('hh')">🏠 By Household</div>
+  <div class="tab" onclick="switchTab('table')">📋 Data Table</div>
+</div>
+
+<!-- ═══ OVERVIEW TAB ═══ -->
+<div class="tab-content active" id="tab-overview">
+  <div class="kpi-row">
+    <div class="kpi"><div class="kpi-icon">🏠</div>
+      <div class="kpi-label">Households Registered</div>
+      <div class="kpi-val" id="kpi-hh">—</div>
+      <div class="kpi-sub" id="kpi-hh-sub">across all villages</div>
+    </div>
+    <div class="kpi sky"><div class="kpi-icon">📋</div>
+      <div class="kpi-label">Lab Result Visits</div>
+      <div class="kpi-val" id="kpi-visits">—</div>
+      <div class="kpi-sub" id="kpi-visits-sub">Form 3 submissions</div>
+    </div>
+    <div class="kpi teal"><div class="kpi-icon">🔬</div>
+      <div class="kpi-label">Avg Container Index</div>
+      <div class="kpi-val" id="kpi-ci">—</div>
+      <div class="kpi-sub" id="kpi-ci-sub">—</div>
+    </div>
+    <div class="kpi amber"><div class="kpi-icon">🦟</div>
+      <div class="kpi-label">Total Prokopack Adults</div>
+      <div class="kpi-val" id="kpi-prok">—</div>
+      <div class="kpi-sub" id="kpi-prok-sub">Ae. aegypti + others</div>
+    </div>
+    <div class="kpi green"><div class="kpi-icon">🌿</div>
+      <div class="kpi-label">Total Larvae</div>
+      <div class="kpi-val" id="kpi-larv">—</div>
+      <div class="kpi-sub" id="kpi-larv-sub">all species combined</div>
+    </div>
+    <div class="kpi red"><div class="kpi-icon">🥚</div>
+      <div class="kpi-label">Total Ovitrap Eggs</div>
+      <div class="kpi-val" id="kpi-ovi">—</div>
+      <div class="kpi-sub" id="kpi-ovi-sub">indoor + outdoor</div>
+    </div>
+  </div>
+  <div class="chart-grid">
+    <div class="chart-box">
+      <h3><span>📊</span> Container Index (%) by Village</h3>
+      <canvas id="chartCIVillage"></canvas>
+    </div>
+    <div class="chart-box">
+      <h3><span>🦟</span> Species Composition — Prokopack</h3>
+      <canvas id="chartSpeciesPie"></canvas>
+    </div>
+  </div>
+  <div class="chart-grid">
+    <div class="chart-box">
+      <h3><span>📈</span> Prokopack Adults by Village</h3>
+      <canvas id="chartProkVillage"></canvas>
+    </div>
+    <div class="chart-box">
+      <h3><span>🌿</span> Total Larvae by Village</h3>
+      <canvas id="chartLarvVillage"></canvas>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ LARVAL TAB ═══ -->
+<div class="tab-content" id="tab-larval">
+  <div class="kpi-row">
+    <div class="kpi teal"><div class="kpi-icon">🔬</div>
+      <div class="kpi-label">Avg Container Index</div>
+      <div class="kpi-val" id="kpi-ci2">—</div>
+      <div class="kpi-sub" id="kpi-ci-sub">—</div>
+    </div>
+    <div class="kpi red"><div class="kpi-icon">🏠</div>
+      <div class="kpi-label">House Index</div>
+      <div class="kpi-val" id="kpi-ci-high">—</div>
+      <div class="kpi-sub" id="kpi-ci-high-sub">across all HHs</div>
+    </div>
+    <div class="kpi green"><div class="kpi-icon">🌿</div>
+      <div class="kpi-label">Total Larvae</div>
+      <div class="kpi-val" id="kpi-larv2">—</div>
+      <div class="kpi-sub" id="kpi-larv2-sub"></div>
+    </div>
+    <div class="kpi amber"><div class="kpi-icon">🪣</div>
+      <div class="kpi-label">Total Containers Inspected</div>
+      <div class="kpi-val" id="kpi-containers">—</div>
+      <div class="kpi-sub" id="kpi-containers-sub"></div>
+    </div>
+  </div>
+  <div class="chart-grid three">
+    <div class="chart-box">
+      <h3><span>📊</span> CI % by Village — WHO Threshold 20%</h3>
+      <canvas id="chartCI2"></canvas>
+    </div>
+    <div class="chart-box">
+      <h3><span>🌿</span> Larvae Species by Village</h3>
+      <canvas id="chartLarvSpecies"></canvas>
+    </div>
+    <div class="chart-box">
+      <h3><span>🪣</span> Containers: Inspected vs Positive</h3>
+      <canvas id="chartContainers"></canvas>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ PROKOPACK TAB ═══ -->
+<div class="tab-content" id="tab-prokopack">
+  <div class="kpi-row">
+    <div class="kpi amber"><div class="kpi-icon">🦟</div>
+      <div class="kpi-label">Total Prokopack Adults</div>
+      <div class="kpi-val" id="kpi-prok2">—</div>
+      <div class="kpi-sub" id="kpi-prok2-sub"></div>
+    </div>
+    <div class="kpi red"><div class="kpi-icon">🦟</div>
+      <div class="kpi-label">Ae. aegypti (F+M)</div>
+      <div class="kpi-val" id="kpi-prok-aeg">—</div>
+      <div class="kpi-sub" id="kpi-prok-aeg-sub"></div>
+    </div>
+    <div class="kpi sky"><div class="kpi-icon">🦟</div>
+      <div class="kpi-label">Ae. albopictus (F+M)</div>
+      <div class="kpi-val" id="kpi-prok-alb">—</div>
+      <div class="kpi-sub" id="kpi-prok-alb-sub"></div>
+    </div>
+    <div class="kpi"><div class="kpi-icon">🦟</div>
+      <div class="kpi-label">Culex sp.</div>
+      <div class="kpi-val" id="kpi-prok-culex">—</div>
+      <div class="kpi-sub" id="kpi-prok-culex-sub"></div>
+    </div>
+  </div>
+  <div class="chart-grid">
+    <div class="chart-box">
+      <h3><span>🦟</span> Prokopack Adults by Village (stacked species)</h3>
+      <canvas id="chartProkStack"></canvas>
+    </div>
+    <div class="chart-box">
+      <h3><span>📊</span> Ae. aegypti % by Village</h3>
+      <canvas id="chartProkAegPct"></canvas>
+    </div>
+  </div>
+  <div class="chart-grid">
+    <div class="chart-box">
+      <h3><span>⚖️</span> Female vs Male — Ae. aegypti by Village</h3>
+      <canvas id="chartProkFM"></canvas>
+    </div>
+    <div class="chart-box">
+      <h3><span>🍩</span> Prokopack Species Composition</h3>
+      <canvas id="chartProkDoughnut"></canvas>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ BG-SENTINEL TAB ═══ -->
+<div class="tab-content" id="tab-bg">
+  <div class="kpi-row">
+    <div class="kpi teal"><div class="kpi-icon">🕷️</div>
+      <div class="kpi-label">Total BG Adults</div>
+      <div class="kpi-val" id="kpi-bg">—</div>
+      <div class="kpi-sub"></div>
+    </div>
+    <div class="kpi red"><div class="kpi-icon">🦟</div>
+      <div class="kpi-label">Ae. aegypti (Total)</div>
+      <div class="kpi-val" id="kpi-bg-aeg">—</div>
+      <div class="kpi-sub" id="kpi-bg-aeg-pct"></div>
+    </div>
+    <div class="kpi sky"><div class="kpi-icon">🦟</div>
+      <div class="kpi-label">Ae. albopictus (Total)</div>
+      <div class="kpi-val" id="kpi-bg-alb">—</div>
+      <div class="kpi-sub"></div>
+    </div>
+    <div class="kpi"><div class="kpi-icon">🦟</div>
+      <div class="kpi-label">Culex sp. (Total)</div>
+      <div class="kpi-val" id="kpi-bg-culex">—</div>
+      <div class="kpi-sub"></div>
+    </div>
+  </div>
+  <div class="chart-grid">
+    <div class="chart-box">
+      <h3><span>🕷️</span> BG Adults by Village (stacked species)</h3>
+      <canvas id="chartBGStack"></canvas>
+    </div>
+    <div class="chart-box">
+      <h3><span>📊</span> Indoor vs Outdoor by Village</h3>
+      <canvas id="chartBGInOut"></canvas>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ OVITRAP TAB ═══ -->
+<div class="tab-content" id="tab-ovitrap">
+  <div class="kpi-row">
+    <div class="kpi amber"><div class="kpi-icon">🥚</div>
+      <div class="kpi-label">Total Eggs</div>
+      <div class="kpi-val" id="kpi-ovi2">—</div>
+      <div class="kpi-sub"></div>
+    </div>
+    <div class="kpi"><div class="kpi-icon">🏠</div>
+      <div class="kpi-label">Eggs Indoor</div>
+      <div class="kpi-val" id="kpi-ovi-in">—</div>
+      <div class="kpi-sub"></div>
+    </div>
+    <div class="kpi green"><div class="kpi-icon">🌿</div>
+      <div class="kpi-label">Eggs Outdoor</div>
+      <div class="kpi-val" id="kpi-ovi-out">—</div>
+      <div class="kpi-sub"></div>
+    </div>
+  </div>
+  <div class="chart-grid">
+    <div class="chart-box">
+      <h3><span>🥚</span> Ovitrap Eggs by Village (Indoor vs Outdoor)</h3>
+      <canvas id="chartOviVillage"></canvas>
+    </div>
+    <div class="chart-box">
+      <h3><span>🍩</span> Indoor vs Outdoor Ratio</h3>
+      <canvas id="chartOviPie"></canvas>
+    </div>
+  </div>
+</div>
+
+
+<!-- ═══ CONTAINER INDEX TAB ═══ -->
+<div class="tab-content" id="tab-container">
+  <div class="kpi-row">
+    <div class="kpi teal"><div class="kpi-icon">🔬</div>
+      <div class="kpi-label">Avg Container Index</div>
+      <div class="kpi-val" id="kpi-ci3">—</div>
+      <div class="kpi-sub" id="kpi-ci-sub">—</div>
+    </div>
+    <div class="kpi red"><div class="kpi-icon">🏠</div>
+      <div class="kpi-label">House Index</div>
+      <div class="kpi-val" id="kpi-ci-high3">—</div>
+      <div class="kpi-sub" id="kpi-ci-high3-sub">across all HHs</div>
+    </div>
+    <div class="kpi amber"><div class="kpi-icon">🪣</div>
+      <div class="kpi-label">Total Containers Inspected</div>
+      <div class="kpi-val" id="kpi-total-cont">—</div>
+      <div class="kpi-sub" id="kpi-total-cont-sub"></div>
+    </div>
+    <div class="kpi sky"><div class="kpi-icon">🏠</div>
+      <div class="kpi-label">Positive Houses (Count)</div>
+      <div class="kpi-val" id="kpi-hi">—</div>
+      <div class="kpi-sub" id="kpi-hi-sub"></div>
+    </div>
+  </div>
+  <div class="chart-grid">
+    <div class="chart-box">
+      <h3><span>📊</span> Container Index (%) by Village — WHO Threshold 20%</h3>
+      <canvas id="chartCI3"></canvas>
+    </div>
+
+  </div>
+  <div class="chart-grid three">
+    <div class="chart-box">
+      <h3><span>🪣</span> Large Containers >10L</h3>
+      <canvas id="chartLarge"></canvas>
+    </div>
+    <div class="chart-box">
+      <h3><span>🫙</span> Small Jars/Vases <10L</h3>
+      <canvas id="chartSmall"></canvas>
+    </div>
+    <div class="chart-box">
+      <h3><span>🗑️</span> Discards</h3>
+      <canvas id="chartDiscards"></canvas>
+    </div>
+  </div>
+  <div class="tbl-box" style="margin-top:16px">
+    <h3>🪣 Container Index Detail by Household</h3>
+    <table>
+      <thead><tr>
+        <th>HH ID</th><th>Village</th><th>Commune</th>
+        <th>>10L Insp</th><th>>10L Pos</th>
+        <th>&lt;10L Insp</th><th>&lt;10L Pos</th>
+        <th>Discards Insp</th><th>Discards Pos</th>
+        <th>Total Insp</th><th>Total Pos</th>
+        <th>CI %</th><th>HI %</th>
+      </tr></thead>
+      <tbody id="ciTableBody"></tbody>
+    </table>
+  </div>
+</div>
+
+
+<!-- ═══ MAP TAB ═══ -->
+<div class="tab-content" id="tab-map">
+  <div class="chart-box" style="margin-bottom:var(--gap)">
+    <h3><span>🗺️</span> Household Locations — Colour by Indicator</h3>
+    <div class="map-controls">
+      <button class="map-ctrl-btn active" onclick="setMapMode('ci')">🪣 Container Index</button>
+      <button class="map-ctrl-btn" onclick="setMapMode('prok')">🦟 Prokopack Adults</button>
+      <button class="map-ctrl-btn" onclick="setMapMode('larv')">🔬 Larvae Total</button>
+      <button class="map-ctrl-btn" onclick="setMapMode('hh')">🏠 All Households</button>
+    </div>
+    <div id="map"></div>
+    <div class="map-info" id="mapLegendBox">
+      <strong>Legend:</strong>
+      <div id="mapLegend" style="display:flex;gap:16px;flex-wrap:wrap;margin-top:8px"></div>
+    </div>
+  </div>
+  <div class="tbl-box">
+    <h3>📍 Household GPS Coordinates</h3>
+    <table>
+      <thead><tr>
+        <th>HH ID</th><th>Village</th><th>Commune</th>
+        <th>HH Code</th><th>Latitude</th><th>Longitude</th>
+        <th>CI %</th><th>Prok Adults</th><th>Larvae</th>
+      </tr></thead>
+      <tbody id="mapTableBody"></tbody>
+    </table>
+  </div>
+</div>
+
+
+<!-- ═══ HH CARDS TAB ═══ -->
+<div class="tab-content" id="tab-hh">
+  <div class="filters" style="margin-bottom:12px">
+    <input style="padding:6px 12px;border:1px solid #E2E8F0;border-radius:8px;font-size:12px;width:220px;outline:none"
+      id="hhSearch" placeholder="🔍 Search HH ID, village…" oninput="renderHHCards()">
+    <select style="padding:6px 10px;border:1px solid #E2E8F0;border-radius:8px;font-size:12px;background:#fff;cursor:pointer"
+      id="hhSort" onchange="renderHHCards()">
+      <option value="hh_id">Sort: HH ID</option>
+      <option value="village">Sort: Village</option>
+      <option value="ci_desc">Sort: CI % ↓</option>
+      <option value="prok_desc">Sort: Prokopack ↓</option>
+      <option value="larv_desc">Sort: Larvae ↓</option>
+    </select>
+    <span style="font-size:11px;color:var(--grey)" id="hhCount"></span>
+  </div>
+  <div class="tbl-box">
+    <table id="hhTable">
+      <thead><tr>
+        <th>HH ID</th>
+        <th>Village</th>
+        <th>Commune</th>
+        <th>HH Code</th>
+        <th>Install Date</th>
+        <th>Lab Date</th>
+        <th>🪣 CI %</th>
+        <th>🪣 Cont. Insp</th>
+        <th>🪣 Cont. Pos</th>
+        <th>🥚 Ovi Eggs</th>
+        <th>🕷️ BG Adults</th>
+        <th>🦟 Prok Adults</th>
+        <th>🦟 Ae.aeg %</th>
+        <th>🔬 Larvae</th>
+        <th>🔬 Larv Aeg%</th>
+        <th>📍 GPS</th>
+      </tr></thead>
+      <tbody id="hhTableBody"></tbody>
+    </table>
+  </div>
+</div>
+
+<!-- ═══ TABLE TAB ═══ -->
+<div class="tab-content" id="tab-table">
+  <div class="tbl-box">
+    <h3>📋 Detailed Surveillance Records</h3>
+    <table id="dataTable">
+      <thead>
+        <tr>
+          <th onclick="sortTable(0)">HH ID ↕</th>
+          <th onclick="sortTable(1)">Village ↕</th>
+          <th onclick="sortTable(2)">Commune ↕</th>
+          <th onclick="sortTable(3)">Lab Date ↕</th>
+          <th onclick="sortTable(4)">Ovi Eggs ↕</th>
+          <th onclick="sortTable(5)">BG Adults ↕</th>
+          <th onclick="sortTable(6)">Prok Adults ↕</th>
+          <th onclick="sortTable(7)">Ae.aeg % ↕</th>
+          <th onclick="sortTable(8)">Larvae ↕</th>
+          <th onclick="sortTable(9)">Larv Aeg% ↕</th>
+          <th onclick="sortTable(10)">CI % ↕</th>
+        </tr>
+      </thead>
+      <tbody id="tableBody"></tbody>
+    </table>
+  </div>
+</div>
+
+<footer>
+  CHAI Battambang · Wolbachia Dengue Program · Entomological Surveillance Dashboard · v2026.07
+  <br><span id="lastUpdated" style="font-size:10px"></span>
+</footer>
+</div>
+
+<script>
+// ══════════════════════════════════════════════════════════════════════════
+// EMBEDDED DATA
+// ══════════════════════════════════════════════════════════════════════════
+const F1_DATA = [{"hh_id": "HH-01", "village": "Toul Ta Ek_v", "commune": "Toul Ta Ek", "hh_code": "010103", "lat": 13.099923, "lon": 103.191416}, {"hh_id": "HH-02", "village": "Toul Ta Ek_v", "commune": "Toul Ta Ek", "hh_code": "020103", "lat": 13.100103, "lon": 103.19062}, {"hh_id": "HH-03", "village": "Toul Ta Ek_v", "commune": "Toul Ta Ek", "hh_code": "030103", "lat": 13.099459, "lon": 103.190925}, {"hh_id": "HH-04", "village": "Toul Ta Ek_v", "commune": "Toul Ta Ek", "hh_code": "040103", "lat": 13.099134, "lon": 103.190926}, {"hh_id": "HH-05", "village": "Toul Ta Ek_v", "commune": "Toul Ta Ek", "hh_code": "050103", "lat": 13.098094, "lon": 103.190734}, {"hh_id": "HH-01", "village": "Otakom", "commune": "Toul Ta Ek", "hh_code": "010203", "lat": 13.094099, "lon": 103.192188}, {"hh_id": "HH-02", "village": "Otakom", "commune": "Toul Ta Ek", "hh_code": "020203", "lat": 13.093778, "lon": 103.192432}, {"hh_id": "HH-03", "village": "Otakom", "commune": "Toul Ta Ek", "hh_code": "030203", "lat": 13.093411, "lon": 103.19284}, {"hh_id": "HH-04", "village": "Otakom", "commune": "Toul Ta Ek", "hh_code": "040203", "lat": 13.09346, "lon": 103.19249}, {"hh_id": "HH-05", "village": "Otakom", "commune": "Toul Ta Ek", "hh_code": "050203", "lat": 13.092859, "lon": 103.192555}, {"hh_id": "HH-01", "village": "Kampong Krabei", "commune": "Svay Por", "hh_code": "010201", "lat": 13.09837, "lon": 103.194821}, {"hh_id": "HH-02", "village": "Kampong Krabei", "commune": "Svay Por", "hh_code": "020201", "lat": 13.098508, "lon": 103.194705}, {"hh_id": "HH-03", "village": "Kampong Krabei", "commune": "Svay Por", "hh_code": "030201", "lat": 13.099071, "lon": 103.195023}, {"hh_id": "HH-04", "village": "Kampong Krabei", "commune": "Svay Por", "hh_code": "040201", "lat": 13.098664, "lon": 103.194855}, {"hh_id": "HH-05", "village": "Kampong Krabei", "commune": "Svay Por", "hh_code": "050201", "lat": 13.098322, "lon": 103.19504}, {"hh_id": "HH-01", "village": "Kamakor", "commune": "Svay Por", "hh_code": "010101", "lat": 13.089695, "lon": 103.197433}, {"hh_id": "HH-02", "village": "Kamakor", "commune": "Svay Por", "hh_code": "020101", "lat": 13.089613, "lon": 103.197106}, {"hh_id": "HH-03", "village": "Kamakor", "commune": "Svay Por", "hh_code": "030101", "lat": 13.089625, "lon": 103.196954}, {"hh_id": "HH-04", "village": "Kamakor", "commune": "Svay Por", "hh_code": "040101", "lat": 13.089362, "lon": 103.197149}, {"hh_id": "HH-05", "village": "Kamakor", "commune": "Svay Por", "hh_code": "050101", "lat": 13.089712, "lon": 103.197217}, {"hh_id": "HH-01", "village": "Rumchek", "commune": "Rattanak", "hh_code": "010102", "lat": 13.099785, "lon": 103.206146}, {"hh_id": "HH-02", "village": "Rumchek", "commune": "Rattanak", "hh_code": "020102", "lat": 13.099772, "lon": 103.206305}, {"hh_id": "HH-03", "village": "Rumchek", "commune": "Rattanak", "hh_code": "030102", "lat": 13.10003, "lon": 103.205338}, {"hh_id": "HH-04", "village": "Rumchek", "commune": "Rattanak", "hh_code": "040102", "lat": 13.100025, "lon": 103.204785}, {"hh_id": "HH-05", "village": "Rumchek", "commune": "Rattanak", "hh_code": "050102", "lat": 13.100084, "lon": 103.203749}, {"hh_id": "HH-01", "village": "Rattanak_v", "commune": "Rattanak", "hh_code": "010202", "lat": 13.10243, "lon": 103.205916}, {"hh_id": "HH-02", "village": "Rattanak_v", "commune": "Rattanak", "hh_code": "020202", "lat": 13.102376, "lon": 103.205276}, {"hh_id": "HH-03", "village": "Rattanak_v", "commune": "Rattanak", "hh_code": "030202", "lat": 13.103259, "lon": 103.204811}, {"hh_id": "HH-04", "village": "Rattanak_v", "commune": "Rattanak", "hh_code": "040202", "lat": 13.103445, "lon": 103.204828}, {"hh_id": "HH-05", "village": "Rattanak_v", "commune": "Rattanak", "hh_code": "050202", "lat": 13.103466, "lon": 103.204881}, {"hh_id": "HH-01", "village": "Numkiem", "commune": "Preak Peahsdach", "hh_code": "010104", "lat": 13.08781, "lon": 103.202091}, {"hh_id": "HH-02", "village": "Numkiem", "commune": "Preak Peahsdach", "hh_code": "020104", "lat": 13.087627, "lon": 103.202407}, {"hh_id": "HH-03", "village": "Numkiem", "commune": "Preak Peahsdach", "hh_code": "030104", "lat": 13.087222, "lon": 103.203076}, {"hh_id": "HH-04", "village": "Numkiem", "commune": "Preak Peahsdach", "hh_code": "040104", "lat": 13.087348, "lon": 103.203311}, {"hh_id": "HH-05", "village": "Numkiem", "commune": "Preak Peahsdach", "hh_code": "050104", "lat": 13.087548, "lon": 103.203624}, {"hh_id": "HH-01", "village": "Ocheay", "commune": "Preak Peahsdach", "hh_code": "010204", "lat": 13.083668, "lon": 103.22205}, {"hh_id": "HH-02", "village": "Ocheay", "commune": "Preak Peahsdach", "hh_code": "020204", "lat": 13.084325, "lon": 103.222362}, {"hh_id": "HH-03", "village": "Ocheay", "commune": "Preak Peahsdach", "hh_code": "030204", "lat": 13.084235, "lon": 103.222763}, {"hh_id": "HH-04", "village": "Ocheay", "commune": "Preak Peahsdach", "hh_code": "040204", "lat": 13.084839, "lon": 103.222952}, {"hh_id": "HH-05", "village": "Ocheay", "commune": "Preak Peahsdach", "hh_code": "050204", "lat": 13.084508, "lon": 103.223836}];
+
+const F2_DATA = [{"hh_id": "HH-01", "village": "Toul Ta Ek_v", "commune": "Toul Ta Ek", "install_date": "2026-06-29", "month": "2026-06", "num_large": 0, "pos_large": 0, "num_small": 10, "pos_small": 0, "num_discards": 0, "pos_discards": 0, "total_containers": 10, "total_positive": 0, "container_index": 0, "house_index": 0, "final_lat": 13.099923, "final_lon": 103.191416, "larval_installed": true, "prokopack_planned": true}, {"hh_id": "HH-02", "village": "Toul Ta Ek_v", "commune": "Toul Ta Ek", "install_date": "2026-06-29", "month": "2026-06", "num_large": 1, "pos_large": 0, "num_small": 0, "pos_small": 0, "num_discards": 1, "pos_discards": 1, "total_containers": 2, "total_positive": 1, "container_index": 50, "house_index": 100, "final_lat": 13.100103, "final_lon": 103.19062, "larval_installed": true, "prokopack_planned": true}, {"hh_id": "HH-03", "village": "Toul Ta Ek_v", "commune": "Toul Ta Ek", "install_date": "2026-06-29", "month": "2026-06", "num_large": 7, "pos_large": 2, "num_small": 0, "pos_small": 0, "num_discards": 4, "pos_discards": 0, "total_containers": 11, "total_positive": 2, "container_index": 18.2, "house_index": 100, "final_lat": 13.099459, "final_lon": 103.190925, "larval_installed": true, "prokopack_planned": true}, {"hh_id": "HH-04", "village": "Toul Ta Ek_v", "commune": "Toul Ta Ek", "install_date": "2026-06-29", "month": "2026-06", "num_large": 1, "pos_large": 0, "num_small": 1, "pos_small": 0, "num_discards": 3, "pos_discards": 1, "total_containers": 5, "total_positive": 1, "container_index": 20, "house_index": 100, "final_lat": 13.099134, "final_lon": 103.190926, "larval_installed": true, "prokopack_planned": true}, {"hh_id": "HH-05", "village": "Toul Ta Ek_v", "commune": "Toul Ta Ek", "install_date": "2026-06-29", "month": "2026-06", "num_large": 1, "pos_large": 0, "num_small": 0, "pos_small": 0, "num_discards": 7, "pos_discards": 1, "total_containers": 8, "total_positive": 1, "container_index": 12.5, "house_index": 100, "final_lat": 13.098094, "final_lon": 103.190734, "larval_installed": true, "prokopack_planned": true}, {"hh_id": "HH-01", "village": "Otakom", "commune": "Toul Ta Ek", "install_date": "2026-07-06", "month": "2026-07", "num_large": 3, "pos_large": 2, "num_small": 0, "pos_small": 0, "num_discards": 0, "pos_discards": 0, "total_containers": 3, "total_positive": 2, "container_index": 66.7, "house_index": 100, "final_lat": 13.094099, "final_lon": 103.192188, "larval_installed": true, "prokopack_planned": true}, {"hh_id": "HH-02", "village": "Otakom", "commune": "Toul Ta Ek", "install_date": "2026-06-29", "month": "2026-06", "num_large": 0, "pos_large": 0, "num_small": 2, "pos_small": 1, "num_discards": 5, "pos_discards": 0, "total_containers": 7, "total_positive": 1, "container_index": 14.3, "house_index": 100, "final_lat": 13.093778, "final_lon": 103.192432, "larval_installed": true, "prokopack_planned": true}, {"hh_id": "HH-03", "village": "Otakom", "commune": "Toul Ta Ek", "install_date": "2026-06-29", "month": "2026-06", "num_large": 9, "pos_large": 3, "num_small": 0, "pos_small": 0, "num_discards": 0, "pos_discards": 0, "total_containers": 9, "total_positive": 3, "container_index": 33.3, "house_index": 100, "final_lat": 13.093411, "final_lon": 103.19284, "larval_installed": true, "prokopack_planned": true}, {"hh_id": "HH-04", "village": "Otakom", "commune": "Toul Ta Ek", "install_date": "2026-06-29", "month": "2026-06", "num_large": 6, "pos_large": 2, "num_small": 0, "pos_small": 0, "num_discards": 0, "pos_discards": 0, "total_containers": 6, "total_positive": 2, "container_index": 33.3, "house_index": 100, "final_lat": 13.09346, "final_lon": 103.19249, "larval_installed": true, "prokopack_planned": true}, {"hh_id": "HH-05", "village": "Otakom", "commune": "Toul Ta Ek", "install_date": "2026-06-29", "month": "2026-06", "num_large": 1, "pos_large": 1, "num_small": 0, "pos_small": 0, "num_discards": 0, "pos_discards": 0, "total_containers": 1, "total_positive": 1, "container_index": 100, "house_index": 100, "final_lat": 13.092859, "final_lon": 103.192555, "larval_installed": true, "prokopack_planned": true}, {"hh_id": "HH-01", "village": "Kamakor", "commune": "Svay Por", "install_date": "2026-06-30", "month": "2026-06", "num_large": 1, "pos_large": 1, "num_small": 0, "pos_small": 0, "num_discards": 1, "pos_discards": 1, "total_containers": 2, "total_positive": 2, "container_index": 100, "house_index": 100, "final_lat": 13.089695, "final_lon": 103.197433, "larval_installed": true, "prokopack_planned": true}, {"hh_id": "HH-02", "village": "Kamakor", "commune": "Svay Por", "install_date": "2026-06-30", "month": "2026-06", "num_large": 5, "pos_large": 0, "num_small": 0, "pos_small": 0, "num_discards": 0, "pos_discards": 0, "total_containers": 5, "total_positive": 0, "container_index": 0, "house_index": 0, "final_lat": 13.089613, "final_lon": 103.197106, "larval_installed": true, "prokopack_planned": true}, {"hh_id": "HH-03", "village": "Kamakor", "commune": "Svay Por", "install_date": "2026-06-30", "month": "2026-06", "num_large": 4, "pos_large": 0, "num_small": 0, "pos_small": 0, "num_discards": 0, "pos_discards": 0, "total_containers": 4, "total_positive": 0, "container_index": 0, "house_index": 0, "final_lat": 13.089625, "final_lon": 103.196954, "larval_installed": true, "prokopack_planned": true}, {"hh_id": "HH-05", "village": "Kamakor", "commune": "Svay Por", "install_date": "2026-06-30", "month": "2026-06", "num_large": 1, "pos_large": 1, "num_small": 0, "pos_small": 0, "num_discards": 0, "pos_discards": 0, "total_containers": 1, "total_positive": 1, "container_index": 100, "house_index": 100, "final_lat": 13.089712, "final_lon": 103.197217, "larval_installed": true, "prokopack_planned": true}, {"hh_id": "HH-05", "village": "Kamakor", "commune": "Svay Por", "install_date": "2026-06-30", "month": "2026-06", "num_large": 1, "pos_large": 1, "num_small": 0, "pos_small": 0, "num_discards": 0, "pos_discards": 0, "total_containers": 1, "total_positive": 1, "container_index": 100, "house_index": 100, "final_lat": 13.089712, "final_lon": 103.197217, "larval_installed": true, "prokopack_planned": true}, {"hh_id": "HH-01", "village": "Kampong Krabei", "commune": "Svay Por", "install_date": "2026-07-06", "month": "2026-07", "num_large": 19, "pos_large": 2, "num_small": 0, "pos_small": 0, "num_discards": 3, "pos_discards": 2, "total_containers": 22, "total_positive": 4, "container_index": 18.2, "house_index": 100, "final_lat": 13.09837, "final_lon": 103.194821, "larval_installed": true, "prokopack_planned": true}, {"hh_id": "HH-02", "village": "Kampong Krabei", "commune": "Svay Por", "install_date": "2026-06-30", "month": "2026-06", "num_large": 3, "pos_large": 0, "num_small": 2, "pos_small": 0, "num_discards": 1, "pos_discards": 1, "total_containers": 6, "total_positive": 1, "container_index": 16.7, "house_index": 100, "final_lat": 13.098508, "final_lon": 103.194705, "larval_installed": true, "prokopack_planned": true}, {"hh_id": "HH-03", "village": "Kampong Krabei", "commune": "Svay Por", "install_date": "2026-06-30", "month": "2026-06", "num_large": 8, "pos_large": 1, "num_small": 0, "pos_small": 0, "num_discards": 0, "pos_discards": 0, "total_containers": 8, "total_positive": 1, "container_index": 12.5, "house_index": 100, "final_lat": 13.099071, "final_lon": 103.195023, "larval_installed": true, "prokopack_planned": true}, {"hh_id": "HH-03", "village": "Kampong Krabei", "commune": "Svay Por", "install_date": "2026-06-30", "month": "2026-06", "num_large": 0, "pos_large": 0, "num_small": 5, "pos_small": 1, "num_discards": 0, "pos_discards": 0, "total_containers": 5, "total_positive": 1, "container_index": 20, "house_index": 100, "final_lat": 13.099071, "final_lon": 103.195023, "larval_installed": true, "prokopack_planned": true}, {"hh_id": "HH-05", "village": "Kampong Krabei", "commune": "Svay Por", "install_date": "2026-06-30", "month": "2026-06", "num_large": 0, "pos_large": 0, "num_small": 5, "pos_small": 0, "num_discards": 0, "pos_discards": 0, "total_containers": 5, "total_positive": 0, "container_index": 0, "house_index": 0, "final_lat": 13.098322, "final_lon": 103.19504, "larval_installed": true, "prokopack_planned": true}, {"hh_id": "HH-01", "village": "Rumchek", "commune": "Rattanak", "install_date": "2026-07-07", "month": "2026-07", "num_large": 3, "pos_large": 2, "num_small": 0, "pos_small": 0, "num_discards": 0, "pos_discards": 0, "total_containers": 3, "total_positive": 2, "container_index": 66.7, "house_index": 100, "final_lat": 13.099785, "final_lon": 103.206146, "larval_installed": true, "prokopack_planned": true}, {"hh_id": "HH-02", "village": "Rumchek", "commune": "Rattanak", "install_date": "2026-06-30", "month": "2026-06", "num_large": 0, "pos_large": 0, "num_small": 9, "pos_small": 0, "num_discards": 0, "pos_discards": 0, "total_containers": 9, "total_positive": 0, "container_index": 0, "house_index": 0, "final_lat": 13.099772, "final_lon": 103.206305, "larval_installed": true, "prokopack_planned": true}, {"hh_id": "HH-03", "village": "Rumchek", "commune": "Rattanak", "install_date": "2026-06-30", "month": "2026-06", "num_large": 6, "pos_large": 0, "num_small": 0, "pos_small": 0, "num_discards": 7, "pos_discards": 0, "total_containers": 13, "total_positive": 0, "container_index": 0, "house_index": 0, "final_lat": 13.10003, "final_lon": 103.205338, "larval_installed": true, "prokopack_planned": true}, {"hh_id": "HH-04", "village": "Rumchek", "commune": "Rattanak", "install_date": "2026-06-30", "month": "2026-06", "num_large": 7, "pos_large": 2, "num_small": 0, "pos_small": 0, "num_discards": 3, "pos_discards": 1, "total_containers": 10, "total_positive": 3, "container_index": 30, "house_index": 100, "final_lat": 13.100025, "final_lon": 103.204785, "larval_installed": true, "prokopack_planned": true}, {"hh_id": "HH-05", "village": "Rumchek", "commune": "Rattanak", "install_date": "2026-06-30", "month": "2026-06", "num_large": 0, "pos_large": 0, "num_small": 0, "pos_small": 0, "num_discards": 0, "pos_discards": 0, "total_containers": 0, "total_positive": 0, "container_index": 0, "house_index": 0, "final_lat": 13.100084, "final_lon": 103.203749, "larval_installed": true, "prokopack_planned": true}, {"hh_id": "HH-01", "village": "Rattanak_v", "commune": "Rattanak", "install_date": "2026-06-30", "month": "2026-06", "num_large": 10, "pos_large": 2, "num_small": 1, "pos_small": 1, "num_discards": 0, "pos_discards": 0, "total_containers": 11, "total_positive": 3, "container_index": 27.3, "house_index": 100, "final_lat": 13.10243, "final_lon": 103.205916, "larval_installed": true, "prokopack_planned": true}, {"hh_id": "HH-02", "village": "Rattanak_v", "commune": "Rattanak", "install_date": "2026-06-30", "month": "2026-06", "num_large": 9, "pos_large": 0, "num_small": 0, "pos_small": 0, "num_discards": 3, "pos_discards": 2, "total_containers": 12, "total_positive": 2, "container_index": 16.7, "house_index": 100, "final_lat": 13.102376, "final_lon": 103.205276, "larval_installed": true, "prokopack_planned": true}, {"hh_id": "HH-03", "village": "Rattanak_v", "commune": "Rattanak", "install_date": "2026-06-30", "month": "2026-06", "num_large": 4, "pos_large": 0, "num_small": 0, "pos_small": 0, "num_discards": 0, "pos_discards": 0, "total_containers": 4, "total_positive": 0, "container_index": 0, "house_index": 0, "final_lat": 13.103259, "final_lon": 103.204811, "larval_installed": true, "prokopack_planned": true}, {"hh_id": "HH-04", "village": "Rattanak_v", "commune": "Rattanak", "install_date": "2026-07-07", "month": "2026-07", "num_large": 4, "pos_large": 0, "num_small": 0, "pos_small": 0, "num_discards": 0, "pos_discards": 0, "total_containers": 4, "total_positive": 0, "container_index": 0, "house_index": 0, "final_lat": 13.103445, "final_lon": 103.204828, "larval_installed": true, "prokopack_planned": true}, {"hh_id": "HH-05", "village": "Rattanak_v", "commune": "Rattanak", "install_date": "2026-07-02", "month": "2026-07", "num_large": 0, "pos_large": 0, "num_small": 5, "pos_small": 0, "num_discards": 0, "pos_discards": 0, "total_containers": 5, "total_positive": 0, "container_index": 0, "house_index": 0, "final_lat": 13.103466, "final_lon": 103.204881, "larval_installed": true, "prokopack_planned": true}, {"hh_id": "HH-01", "village": "Numkiem", "commune": "Preak Peahsdach", "install_date": "2026-07-02", "month": "2026-07", "num_large": 6, "pos_large": 3, "num_small": 0, "pos_small": 0, "num_discards": 0, "pos_discards": 0, "total_containers": 6, "total_positive": 3, "container_index": 50, "house_index": 100, "final_lat": 13.08781, "final_lon": 103.202091, "larval_installed": true, "prokopack_planned": true}, {"hh_id": "HH-02", "village": "Numkiem", "commune": "Preak Peahsdach", "install_date": "2026-07-02", "month": "2026-07", "num_large": 1, "pos_large": 1, "num_small": 0, "pos_small": 0, "num_discards": 0, "pos_discards": 0, "total_containers": 1, "total_positive": 1, "container_index": 100, "house_index": 100, "final_lat": 13.087627, "final_lon": 103.202407, "larval_installed": true, "prokopack_planned": true}, {"hh_id": "HH-03", "village": "Numkiem", "commune": "Preak Peahsdach", "install_date": "2026-07-03", "month": "2026-07", "num_large": 0, "pos_large": 0, "num_small": 3, "pos_small": 1, "num_discards": 6, "pos_discards": 1, "total_containers": 9, "total_positive": 2, "container_index": 22.2, "house_index": 100, "final_lat": 13.087222, "final_lon": 103.203076, "larval_installed": true, "prokopack_planned": true}, {"hh_id": "HH-04", "village": "Numkiem", "commune": "Preak Peahsdach", "install_date": "2026-07-03", "month": "2026-07", "num_large": 6, "pos_large": 3, "num_small": 9, "pos_small": 5, "num_discards": 1, "pos_discards": 1, "total_containers": 16, "total_positive": 9, "container_index": 56.3, "house_index": 100, "final_lat": 13.087348, "final_lon": 103.203311, "larval_installed": true, "prokopack_planned": true}, {"hh_id": "HH-05", "village": "Numkiem", "commune": "Preak Peahsdach", "install_date": "2026-07-03", "month": "2026-07", "num_large": 4, "pos_large": 2, "num_small": 0, "pos_small": 0, "num_discards": 5, "pos_discards": 1, "total_containers": 9, "total_positive": 3, "container_index": 33.3, "house_index": 100, "final_lat": 13.087548, "final_lon": 103.203624, "larval_installed": true, "prokopack_planned": true}, {"hh_id": "HH-01", "village": "Ocheay", "commune": "Preak Peahsdach", "install_date": "2026-07-03", "month": "2026-07", "num_large": 6, "pos_large": 0, "num_small": 0, "pos_small": 0, "num_discards": 10, "pos_discards": 2, "total_containers": 16, "total_positive": 2, "container_index": 12.5, "house_index": 100, "final_lat": 13.083668, "final_lon": 103.22205, "larval_installed": true, "prokopack_planned": true}, {"hh_id": "HH-02", "village": "Ocheay", "commune": "Preak Peahsdach", "install_date": "2026-07-03", "month": "2026-07", "num_large": 5, "pos_large": 0, "num_small": 1, "pos_small": 0, "num_discards": 6, "pos_discards": 3, "total_containers": 12, "total_positive": 3, "container_index": 25, "house_index": 100, "final_lat": 13.084325, "final_lon": 103.222362, "larval_installed": true, "prokopack_planned": true}, {"hh_id": "HH-03", "village": "Ocheay", "commune": "Preak Peahsdach", "install_date": "2026-07-03", "month": "2026-07", "num_large": 5, "pos_large": 1, "num_small": 1, "pos_small": 0, "num_discards": 8, "pos_discards": 2, "total_containers": 14, "total_positive": 3, "container_index": 21.4, "house_index": 100, "final_lat": 13.084235, "final_lon": 103.222763, "larval_installed": true, "prokopack_planned": true}, {"hh_id": "HH-05", "village": "Ocheay", "commune": "Preak Peahsdach", "install_date": "2026-07-03", "month": "2026-07", "num_large": 1, "pos_large": 1, "num_small": 1, "pos_small": 1, "num_discards": 6, "pos_discards": 0, "total_containers": 8, "total_positive": 2, "container_index": 25, "house_index": 100, "final_lat": 13.084508, "final_lon": 103.223836, "larval_installed": true, "prokopack_planned": true}, {"hh_id": "HH-05", "village": "Ocheay", "commune": "Preak Peahsdach", "install_date": "2026-07-03", "month": "2026-07", "num_large": 1, "pos_large": 1, "num_small": 3, "pos_small": 2, "num_discards": 4, "pos_discards": 0, "total_containers": 8, "total_positive": 3, "container_index": 37.5, "house_index": 100, "final_lat": 13.084508, "final_lon": 103.223836, "larval_installed": true, "prokopack_planned": true}];
+
+const F3_DATA = [{"hh_id": "HH-01", "village": "Kamakor", "commune": "Svay Por", "lab_date": "2026-07-03", "month": "2026-07", "year": "2026", "ovi_eggs_indoor": 0, "ovi_eggs_outdoor": 0, "ovi_eggs_total": 0, "bg_aeg_f_in": 0, "bg_aeg_m_in": 0, "bg_alb_f_in": 0, "bg_alb_m_in": 0, "bg_culex_in": 0, "bg_aeg_f_out": 0, "bg_aeg_m_out": 0, "bg_alb_f_out": 0, "bg_alb_m_out": 0, "bg_culex_out": 0, "bg_aeg_total": 0, "bg_alb_total": 0, "bg_culex_total": 0, "bg_adults_total": 0, "bg_aeg_pct": 0, "prok_aeg_female": 0, "prok_aeg_male": 0, "prok_alb_female": 0, "prok_alb_male": 0, "prok_culex": 0, "prok_aeg_total": 0, "prok_alb_total": 0, "prok_adults_total": 0, "prok_aeg_pct": 0, "prok_alb_pct": 0, "larv_aeg": 20, "larv_alb": 0, "larv_culex": 0, "larv_total": 20, "larv_aeg_pct": 100}, {"hh_id": "HH-02", "village": "Kamakor", "commune": "Svay Por", "lab_date": "2026-07-03", "month": "2026-07", "year": "2026", "ovi_eggs_indoor": 0, "ovi_eggs_outdoor": 0, "ovi_eggs_total": 0, "bg_aeg_f_in": 0, "bg_aeg_m_in": 0, "bg_alb_f_in": 0, "bg_alb_m_in": 0, "bg_culex_in": 0, "bg_aeg_f_out": 0, "bg_aeg_m_out": 0, "bg_alb_f_out": 0, "bg_alb_m_out": 0, "bg_culex_out": 0, "bg_aeg_total": 0, "bg_alb_total": 0, "bg_culex_total": 0, "bg_adults_total": 0, "bg_aeg_pct": 0, "prok_aeg_female": 1, "prok_aeg_male": 0, "prok_alb_female": 0, "prok_alb_male": 0, "prok_culex": 14, "prok_aeg_total": 1, "prok_alb_total": 0, "prok_adults_total": 15, "prok_aeg_pct": 6.7, "prok_alb_pct": 0, "larv_aeg": 0, "larv_alb": 0, "larv_culex": 0, "larv_total": 0, "larv_aeg_pct": 0}, {"hh_id": "HH-03", "village": "Kamakor", "commune": "Svay Por", "lab_date": "2026-07-03", "month": "2026-07", "year": "2026", "ovi_eggs_indoor": 0, "ovi_eggs_outdoor": 0, "ovi_eggs_total": 0, "bg_aeg_f_in": 0, "bg_aeg_m_in": 0, "bg_alb_f_in": 0, "bg_alb_m_in": 0, "bg_culex_in": 0, "bg_aeg_f_out": 0, "bg_aeg_m_out": 0, "bg_alb_f_out": 0, "bg_alb_m_out": 0, "bg_culex_out": 0, "bg_aeg_total": 0, "bg_alb_total": 0, "bg_culex_total": 0, "bg_adults_total": 0, "bg_aeg_pct": 0, "prok_aeg_female": 1, "prok_aeg_male": 0, "prok_alb_female": 0, "prok_alb_male": 0, "prok_culex": 0, "prok_aeg_total": 1, "prok_alb_total": 0, "prok_adults_total": 1, "prok_aeg_pct": 100, "prok_alb_pct": 0, "larv_aeg": 0, "larv_alb": 0, "larv_culex": 0, "larv_total": 0, "larv_aeg_pct": 0}, {"hh_id": "HH-04", "village": "Kamakor", "commune": "Svay Por", "lab_date": "2026-07-03", "month": "2026-07", "year": "2026", "ovi_eggs_indoor": 0, "ovi_eggs_outdoor": 0, "ovi_eggs_total": 0, "bg_aeg_f_in": 0, "bg_aeg_m_in": 0, "bg_alb_f_in": 0, "bg_alb_m_in": 0, "bg_culex_in": 0, "bg_aeg_f_out": 0, "bg_aeg_m_out": 0, "bg_alb_f_out": 0, "bg_alb_m_out": 0, "bg_culex_out": 0, "bg_aeg_total": 0, "bg_alb_total": 0, "bg_culex_total": 0, "bg_adults_total": 0, "bg_aeg_pct": 0, "prok_aeg_female": 0, "prok_aeg_male": 0, "prok_alb_female": 0, "prok_alb_male": 0, "prok_culex": 0, "prok_aeg_total": 0, "prok_alb_total": 0, "prok_adults_total": 0, "prok_aeg_pct": 0, "prok_alb_pct": 0, "larv_aeg": 10, "larv_alb": 0, "larv_culex": 0, "larv_total": 10, "larv_aeg_pct": 100}, {"hh_id": "HH-05", "village": "Kamakor", "commune": "Svay Por", "lab_date": "2026-07-03", "month": "2026-07", "year": "2026", "ovi_eggs_indoor": 0, "ovi_eggs_outdoor": 0, "ovi_eggs_total": 0, "bg_aeg_f_in": 0, "bg_aeg_m_in": 0, "bg_alb_f_in": 0, "bg_alb_m_in": 0, "bg_culex_in": 0, "bg_aeg_f_out": 0, "bg_aeg_m_out": 0, "bg_alb_f_out": 0, "bg_alb_m_out": 0, "bg_culex_out": 0, "bg_aeg_total": 0, "bg_alb_total": 0, "bg_culex_total": 0, "bg_adults_total": 0, "bg_aeg_pct": 0, "prok_aeg_female": 0, "prok_aeg_male": 0, "prok_alb_female": 0, "prok_alb_male": 0, "prok_culex": 0, "prok_aeg_total": 0, "prok_alb_total": 0, "prok_adults_total": 0, "prok_aeg_pct": 0, "prok_alb_pct": 0, "larv_aeg": 10, "larv_alb": 0, "larv_culex": 0, "larv_total": 10, "larv_aeg_pct": 100}, {"hh_id": "HH-01", "village": "Kampong Krabei", "commune": "Svay Por", "lab_date": "2026-07-03", "month": "2026-07", "year": "2026", "ovi_eggs_indoor": 0, "ovi_eggs_outdoor": 0, "ovi_eggs_total": 0, "bg_aeg_f_in": 0, "bg_aeg_m_in": 0, "bg_alb_f_in": 0, "bg_alb_m_in": 0, "bg_culex_in": 0, "bg_aeg_f_out": 0, "bg_aeg_m_out": 0, "bg_alb_f_out": 0, "bg_alb_m_out": 0, "bg_culex_out": 0, "bg_aeg_total": 0, "bg_alb_total": 0, "bg_culex_total": 0, "bg_adults_total": 0, "bg_aeg_pct": 0, "prok_aeg_female": 0, "prok_aeg_male": 4, "prok_alb_female": 0, "prok_alb_male": 0, "prok_culex": 0, "prok_aeg_total": 4, "prok_alb_total": 0, "prok_adults_total": 4, "prok_aeg_pct": 100, "prok_alb_pct": 0, "larv_aeg": 40, "larv_alb": 0, "larv_culex": 0, "larv_total": 40, "larv_aeg_pct": 100}, {"hh_id": "HH-02", "village": "Kampong Krabei", "commune": "Svay Por", "lab_date": "2026-07-03", "month": "2026-07", "year": "2026", "ovi_eggs_indoor": 0, "ovi_eggs_outdoor": 0, "ovi_eggs_total": 0, "bg_aeg_f_in": 0, "bg_aeg_m_in": 0, "bg_alb_f_in": 0, "bg_alb_m_in": 0, "bg_culex_in": 0, "bg_aeg_f_out": 0, "bg_aeg_m_out": 0, "bg_alb_f_out": 0, "bg_alb_m_out": 0, "bg_culex_out": 0, "bg_aeg_total": 0, "bg_alb_total": 0, "bg_culex_total": 0, "bg_adults_total": 0, "bg_aeg_pct": 0, "prok_aeg_female": 4, "prok_aeg_male": 14, "prok_alb_female": 0, "prok_alb_male": 0, "prok_culex": 3, "prok_aeg_total": 18, "prok_alb_total": 0, "prok_adults_total": 21, "prok_aeg_pct": 85.7, "prok_alb_pct": 0, "larv_aeg": 10, "larv_alb": 0, "larv_culex": 0, "larv_total": 10, "larv_aeg_pct": 100}, {"hh_id": "HH-03", "village": "Kampong Krabei", "commune": "Svay Por", "lab_date": "2026-07-03", "month": "2026-07", "year": "2026", "ovi_eggs_indoor": 0, "ovi_eggs_outdoor": 0, "ovi_eggs_total": 0, "bg_aeg_f_in": 0, "bg_aeg_m_in": 0, "bg_alb_f_in": 0, "bg_alb_m_in": 0, "bg_culex_in": 0, "bg_aeg_f_out": 0, "bg_aeg_m_out": 0, "bg_alb_f_out": 0, "bg_alb_m_out": 0, "bg_culex_out": 0, "bg_aeg_total": 0, "bg_alb_total": 0, "bg_culex_total": 0, "bg_adults_total": 0, "bg_aeg_pct": 0, "prok_aeg_female": 2, "prok_aeg_male": 1, "prok_alb_female": 0, "prok_alb_male": 0, "prok_culex": 2, "prok_aeg_total": 3, "prok_alb_total": 0, "prok_adults_total": 5, "prok_aeg_pct": 60, "prok_alb_pct": 0, "larv_aeg": 10, "larv_alb": 0, "larv_culex": 0, "larv_total": 10, "larv_aeg_pct": 100}, {"hh_id": "HH-04", "village": "Kampong Krabei", "commune": "Svay Por", "lab_date": "2026-07-03", "month": "2026-07", "year": "2026", "ovi_eggs_indoor": 0, "ovi_eggs_outdoor": 0, "ovi_eggs_total": 0, "bg_aeg_f_in": 0, "bg_aeg_m_in": 0, "bg_alb_f_in": 0, "bg_alb_m_in": 0, "bg_culex_in": 0, "bg_aeg_f_out": 0, "bg_aeg_m_out": 0, "bg_alb_f_out": 0, "bg_alb_m_out": 0, "bg_culex_out": 0, "bg_aeg_total": 0, "bg_alb_total": 0, "bg_culex_total": 0, "bg_adults_total": 0, "bg_aeg_pct": 0, "prok_aeg_female": 3, "prok_aeg_male": 3, "prok_alb_female": 0, "prok_alb_male": 0, "prok_culex": 0, "prok_aeg_total": 6, "prok_alb_total": 0, "prok_adults_total": 6, "prok_aeg_pct": 100, "prok_alb_pct": 0, "larv_aeg": 10, "larv_alb": 0, "larv_culex": 0, "larv_total": 10, "larv_aeg_pct": 100}, {"hh_id": "HH-05", "village": "Kampong Krabei", "commune": "Svay Por", "lab_date": "2026-07-03", "month": "2026-07", "year": "2026", "ovi_eggs_indoor": 0, "ovi_eggs_outdoor": 0, "ovi_eggs_total": 0, "bg_aeg_f_in": 0, "bg_aeg_m_in": 0, "bg_alb_f_in": 0, "bg_alb_m_in": 0, "bg_culex_in": 0, "bg_aeg_f_out": 0, "bg_aeg_m_out": 0, "bg_alb_f_out": 0, "bg_alb_m_out": 0, "bg_culex_out": 0, "bg_aeg_total": 0, "bg_alb_total": 0, "bg_culex_total": 0, "bg_adults_total": 0, "bg_aeg_pct": 0, "prok_aeg_female": 1, "prok_aeg_male": 1, "prok_alb_female": 0, "prok_alb_male": 0, "prok_culex": 8, "prok_aeg_total": 2, "prok_alb_total": 0, "prok_adults_total": 10, "prok_aeg_pct": 20, "prok_alb_pct": 0, "larv_aeg": 0, "larv_alb": 0, "larv_culex": 0, "larv_total": 0, "larv_aeg_pct": 0}, {"hh_id": "HH-01", "village": "Rumchek", "commune": "Rattanak", "lab_date": "2026-07-03", "month": "2026-07", "year": "2026", "ovi_eggs_indoor": 0, "ovi_eggs_outdoor": 0, "ovi_eggs_total": 0, "bg_aeg_f_in": 0, "bg_aeg_m_in": 0, "bg_alb_f_in": 0, "bg_alb_m_in": 0, "bg_culex_in": 0, "bg_aeg_f_out": 0, "bg_aeg_m_out": 0, "bg_alb_f_out": 0, "bg_alb_m_out": 0, "bg_culex_out": 0, "bg_aeg_total": 0, "bg_alb_total": 0, "bg_culex_total": 0, "bg_adults_total": 0, "bg_aeg_pct": 0, "prok_aeg_female": 0, "prok_aeg_male": 0, "prok_alb_female": 0, "prok_alb_male": 0, "prok_culex": 90, "prok_aeg_total": 0, "prok_alb_total": 0, "prok_adults_total": 90, "prok_aeg_pct": 0, "prok_alb_pct": 0, "larv_aeg": 20, "larv_alb": 0, "larv_culex": 0, "larv_total": 20, "larv_aeg_pct": 100}, {"hh_id": "HH-02", "village": "Rumchek", "commune": "Rattanak", "lab_date": "2026-07-03", "month": "2026-07", "year": "2026", "ovi_eggs_indoor": 0, "ovi_eggs_outdoor": 0, "ovi_eggs_total": 0, "bg_aeg_f_in": 0, "bg_aeg_m_in": 0, "bg_alb_f_in": 0, "bg_alb_m_in": 0, "bg_culex_in": 0, "bg_aeg_f_out": 0, "bg_aeg_m_out": 0, "bg_alb_f_out": 0, "bg_alb_m_out": 0, "bg_culex_out": 0, "bg_aeg_total": 0, "bg_alb_total": 0, "bg_culex_total": 0, "bg_adults_total": 0, "bg_aeg_pct": 0, "prok_aeg_female": 1, "prok_aeg_male": 0, "prok_alb_female": 0, "prok_alb_male": 0, "prok_culex": 22, "prok_aeg_total": 1, "prok_alb_total": 0, "prok_adults_total": 23, "prok_aeg_pct": 4.3, "prok_alb_pct": 0, "larv_aeg": 0, "larv_alb": 0, "larv_culex": 0, "larv_total": 0, "larv_aeg_pct": 0}, {"hh_id": "HH-03", "village": "Rumchek", "commune": "Rattanak", "lab_date": "2026-07-03", "month": "2026-07", "year": "2026", "ovi_eggs_indoor": 0, "ovi_eggs_outdoor": 0, "ovi_eggs_total": 0, "bg_aeg_f_in": 0, "bg_aeg_m_in": 0, "bg_alb_f_in": 0, "bg_alb_m_in": 0, "bg_culex_in": 0, "bg_aeg_f_out": 0, "bg_aeg_m_out": 0, "bg_alb_f_out": 0, "bg_alb_m_out": 0, "bg_culex_out": 0, "bg_aeg_total": 0, "bg_alb_total": 0, "bg_culex_total": 0, "bg_adults_total": 0, "bg_aeg_pct": 0, "prok_aeg_female": 0, "prok_aeg_male": 2, "prok_alb_female": 0, "prok_alb_male": 0, "prok_culex": 32, "prok_aeg_total": 2, "prok_alb_total": 0, "prok_adults_total": 34, "prok_aeg_pct": 5.9, "prok_alb_pct": 0, "larv_aeg": 0, "larv_alb": 0, "larv_culex": 0, "larv_total": 0, "larv_aeg_pct": 0}, {"hh_id": "HH-04", "village": "Rumchek", "commune": "Rattanak", "lab_date": "2026-07-03", "month": "2026-07", "year": "2026", "ovi_eggs_indoor": 0, "ovi_eggs_outdoor": 0, "ovi_eggs_total": 0, "bg_aeg_f_in": 0, "bg_aeg_m_in": 0, "bg_alb_f_in": 0, "bg_alb_m_in": 0, "bg_culex_in": 0, "bg_aeg_f_out": 0, "bg_aeg_m_out": 0, "bg_alb_f_out": 0, "bg_alb_m_out": 0, "bg_culex_out": 0, "bg_aeg_total": 0, "bg_alb_total": 0, "bg_culex_total": 0, "bg_adults_total": 0, "bg_aeg_pct": 0, "prok_aeg_female": 0, "prok_aeg_male": 0, "prok_alb_female": 0, "prok_alb_male": 0, "prok_culex": 15, "prok_aeg_total": 0, "prok_alb_total": 0, "prok_adults_total": 15, "prok_aeg_pct": 0, "prok_alb_pct": 0, "larv_aeg": 30, "larv_alb": 0, "larv_culex": 0, "larv_total": 30, "larv_aeg_pct": 100}, {"hh_id": "HH-05", "village": "Rumchek", "commune": "Rattanak", "lab_date": "2026-07-03", "month": "2026-07", "year": "2026", "ovi_eggs_indoor": 0, "ovi_eggs_outdoor": 0, "ovi_eggs_total": 0, "bg_aeg_f_in": 0, "bg_aeg_m_in": 0, "bg_alb_f_in": 0, "bg_alb_m_in": 0, "bg_culex_in": 0, "bg_aeg_f_out": 0, "bg_aeg_m_out": 0, "bg_alb_f_out": 0, "bg_alb_m_out": 0, "bg_culex_out": 0, "bg_aeg_total": 0, "bg_alb_total": 0, "bg_culex_total": 0, "bg_adults_total": 0, "bg_aeg_pct": 0, "prok_aeg_female": 0, "prok_aeg_male": 0, "prok_alb_female": 0, "prok_alb_male": 0, "prok_culex": 12, "prok_aeg_total": 0, "prok_alb_total": 0, "prok_adults_total": 12, "prok_aeg_pct": 0, "prok_alb_pct": 0, "larv_aeg": 0, "larv_alb": 0, "larv_culex": 0, "larv_total": 0, "larv_aeg_pct": 0}, {"hh_id": "HH-01", "village": "Rattanak_v", "commune": "Rattanak", "lab_date": "2026-07-03", "month": "2026-07", "year": "2026", "ovi_eggs_indoor": 0, "ovi_eggs_outdoor": 0, "ovi_eggs_total": 0, "bg_aeg_f_in": 0, "bg_aeg_m_in": 0, "bg_alb_f_in": 0, "bg_alb_m_in": 0, "bg_culex_in": 0, "bg_aeg_f_out": 0, "bg_aeg_m_out": 0, "bg_alb_f_out": 0, "bg_alb_m_out": 0, "bg_culex_out": 0, "bg_aeg_total": 0, "bg_alb_total": 0, "bg_culex_total": 0, "bg_adults_total": 0, "bg_aeg_pct": 0, "prok_aeg_female": 2, "prok_aeg_male": 2, "prok_alb_female": 0, "prok_alb_male": 0, "prok_culex": 0, "prok_aeg_total": 4, "prok_alb_total": 0, "prok_adults_total": 4, "prok_aeg_pct": 100, "prok_alb_pct": 0, "larv_aeg": 30, "larv_alb": 0, "larv_culex": 0, "larv_total": 30, "larv_aeg_pct": 100}, {"hh_id": "HH-02", "village": "Rattanak_v", "commune": "Rattanak", "lab_date": "2026-07-03", "month": "2026-07", "year": "2026", "ovi_eggs_indoor": 0, "ovi_eggs_outdoor": 0, "ovi_eggs_total": 0, "bg_aeg_f_in": 0, "bg_aeg_m_in": 0, "bg_alb_f_in": 0, "bg_alb_m_in": 0, "bg_culex_in": 0, "bg_aeg_f_out": 0, "bg_aeg_m_out": 0, "bg_alb_f_out": 0, "bg_alb_m_out": 0, "bg_culex_out": 0, "bg_aeg_total": 0, "bg_alb_total": 0, "bg_culex_total": 0, "bg_adults_total": 0, "bg_aeg_pct": 0, "prok_aeg_female": 1, "prok_aeg_male": 0, "prok_alb_female": 0, "prok_alb_male": 0, "prok_culex": 0, "prok_aeg_total": 1, "prok_alb_total": 0, "prok_adults_total": 1, "prok_aeg_pct": 100, "prok_alb_pct": 0, "larv_aeg": 20, "larv_alb": 0, "larv_culex": 0, "larv_total": 20, "larv_aeg_pct": 100}, {"hh_id": "HH-03", "village": "Rattanak_v", "commune": "Rattanak", "lab_date": "2026-07-03", "month": "2026-07", "year": "2026", "ovi_eggs_indoor": 0, "ovi_eggs_outdoor": 0, "ovi_eggs_total": 0, "bg_aeg_f_in": 0, "bg_aeg_m_in": 0, "bg_alb_f_in": 0, "bg_alb_m_in": 0, "bg_culex_in": 0, "bg_aeg_f_out": 0, "bg_aeg_m_out": 0, "bg_alb_f_out": 0, "bg_alb_m_out": 0, "bg_culex_out": 0, "bg_aeg_total": 0, "bg_alb_total": 0, "bg_culex_total": 0, "bg_adults_total": 0, "bg_aeg_pct": 0, "prok_aeg_female": 1, "prok_aeg_male": 0, "prok_alb_female": 0, "prok_alb_male": 0, "prok_culex": 0, "prok_aeg_total": 1, "prok_alb_total": 0, "prok_adults_total": 1, "prok_aeg_pct": 100, "prok_alb_pct": 0, "larv_aeg": 0, "larv_alb": 0, "larv_culex": 0, "larv_total": 0, "larv_aeg_pct": 0}, {"hh_id": "HH-04", "village": "Rattanak_v", "commune": "Rattanak", "lab_date": "2026-07-03", "month": "2026-07", "year": "2026", "ovi_eggs_indoor": 0, "ovi_eggs_outdoor": 0, "ovi_eggs_total": 0, "bg_aeg_f_in": 0, "bg_aeg_m_in": 0, "bg_alb_f_in": 0, "bg_alb_m_in": 0, "bg_culex_in": 0, "bg_aeg_f_out": 0, "bg_aeg_m_out": 0, "bg_alb_f_out": 0, "bg_alb_m_out": 0, "bg_culex_out": 0, "bg_aeg_total": 0, "bg_alb_total": 0, "bg_culex_total": 0, "bg_adults_total": 0, "bg_aeg_pct": 0, "prok_aeg_female": 0, "prok_aeg_male": 2, "prok_alb_female": 0, "prok_alb_male": 0, "prok_culex": 2, "prok_aeg_total": 2, "prok_alb_total": 0, "prok_adults_total": 4, "prok_aeg_pct": 50, "prok_alb_pct": 0, "larv_aeg": 0, "larv_alb": 0, "larv_culex": 0, "larv_total": 0, "larv_aeg_pct": 0}, {"hh_id": "HH-05", "village": "Rattanak_v", "commune": "Rattanak", "lab_date": "2026-07-03", "month": "2026-07", "year": "2026", "ovi_eggs_indoor": 0, "ovi_eggs_outdoor": 0, "ovi_eggs_total": 0, "bg_aeg_f_in": 0, "bg_aeg_m_in": 0, "bg_alb_f_in": 0, "bg_alb_m_in": 0, "bg_culex_in": 0, "bg_aeg_f_out": 0, "bg_aeg_m_out": 0, "bg_alb_f_out": 0, "bg_alb_m_out": 0, "bg_culex_out": 0, "bg_aeg_total": 0, "bg_alb_total": 0, "bg_culex_total": 0, "bg_adults_total": 0, "bg_aeg_pct": 0, "prok_aeg_female": 2, "prok_aeg_male": 0, "prok_alb_female": 0, "prok_alb_male": 0, "prok_culex": 0, "prok_aeg_total": 2, "prok_alb_total": 0, "prok_adults_total": 2, "prok_aeg_pct": 100, "prok_alb_pct": 0, "larv_aeg": 0, "larv_alb": 0, "larv_culex": 0, "larv_total": 0, "larv_aeg_pct": 0}, {"hh_id": "HH-02", "village": "Toul Ta Ek_v", "commune": "Toul Ta Ek", "lab_date": "2026-07-03", "month": "2026-07", "year": "2026", "ovi_eggs_indoor": 0, "ovi_eggs_outdoor": 0, "ovi_eggs_total": 0, "bg_aeg_f_in": 0, "bg_aeg_m_in": 0, "bg_alb_f_in": 0, "bg_alb_m_in": 0, "bg_culex_in": 0, "bg_aeg_f_out": 0, "bg_aeg_m_out": 0, "bg_alb_f_out": 0, "bg_alb_m_out": 0, "bg_culex_out": 0, "bg_aeg_total": 0, "bg_alb_total": 0, "bg_culex_total": 0, "bg_adults_total": 0, "bg_aeg_pct": 0, "prok_aeg_female": 0, "prok_aeg_male": 0, "prok_alb_female": 0, "prok_alb_male": 0, "prok_culex": 3, "prok_aeg_total": 0, "prok_alb_total": 0, "prok_adults_total": 3, "prok_aeg_pct": 0, "prok_alb_pct": 0, "larv_aeg": 10, "larv_alb": 0, "larv_culex": 0, "larv_total": 10, "larv_aeg_pct": 100}, {"hh_id": "HH-03", "village": "Toul Ta Ek_v", "commune": "Toul Ta Ek", "lab_date": "2026-07-03", "month": "2026-07", "year": "2026", "ovi_eggs_indoor": 0, "ovi_eggs_outdoor": 0, "ovi_eggs_total": 0, "bg_aeg_f_in": 0, "bg_aeg_m_in": 0, "bg_alb_f_in": 0, "bg_alb_m_in": 0, "bg_culex_in": 0, "bg_aeg_f_out": 0, "bg_aeg_m_out": 0, "bg_alb_f_out": 0, "bg_alb_m_out": 0, "bg_culex_out": 0, "bg_aeg_total": 0, "bg_alb_total": 0, "bg_culex_total": 0, "bg_adults_total": 0, "bg_aeg_pct": 0, "prok_aeg_female": 0, "prok_aeg_male": 0, "prok_alb_female": 0, "prok_alb_male": 0, "prok_culex": 7, "prok_aeg_total": 0, "prok_alb_total": 0, "prok_adults_total": 7, "prok_aeg_pct": 0, "prok_alb_pct": 0, "larv_aeg": 20, "larv_alb": 0, "larv_culex": 0, "larv_total": 20, "larv_aeg_pct": 100}, {"hh_id": "HH-04", "village": "Toul Ta Ek_v", "commune": "Toul Ta Ek", "lab_date": "2026-07-03", "month": "2026-07", "year": "2026", "ovi_eggs_indoor": 0, "ovi_eggs_outdoor": 0, "ovi_eggs_total": 0, "bg_aeg_f_in": 0, "bg_aeg_m_in": 0, "bg_alb_f_in": 0, "bg_alb_m_in": 0, "bg_culex_in": 0, "bg_aeg_f_out": 0, "bg_aeg_m_out": 0, "bg_alb_f_out": 0, "bg_alb_m_out": 0, "bg_culex_out": 0, "bg_aeg_total": 0, "bg_alb_total": 0, "bg_culex_total": 0, "bg_adults_total": 0, "bg_aeg_pct": 0, "prok_aeg_female": 1, "prok_aeg_male": 0, "prok_alb_female": 0, "prok_alb_male": 0, "prok_culex": 0, "prok_aeg_total": 1, "prok_alb_total": 0, "prok_adults_total": 1, "prok_aeg_pct": 100, "prok_alb_pct": 0, "larv_aeg": 10, "larv_alb": 0, "larv_culex": 0, "larv_total": 10, "larv_aeg_pct": 100}, {"hh_id": "HH-05", "village": "Toul Ta Ek_v", "commune": "Toul Ta Ek", "lab_date": "2026-07-03", "month": "2026-07", "year": "2026", "ovi_eggs_indoor": 0, "ovi_eggs_outdoor": 0, "ovi_eggs_total": 0, "bg_aeg_f_in": 0, "bg_aeg_m_in": 0, "bg_alb_f_in": 0, "bg_alb_m_in": 0, "bg_culex_in": 0, "bg_aeg_f_out": 0, "bg_aeg_m_out": 0, "bg_alb_f_out": 0, "bg_alb_m_out": 0, "bg_culex_out": 0, "bg_aeg_total": 0, "bg_alb_total": 0, "bg_culex_total": 0, "bg_adults_total": 0, "bg_aeg_pct": 0, "prok_aeg_female": 0, "prok_aeg_male": 2, "prok_alb_female": 0, "prok_alb_male": 0, "prok_culex": 1, "prok_aeg_total": 2, "prok_alb_total": 0, "prok_adults_total": 3, "prok_aeg_pct": 66.7, "prok_alb_pct": 0, "larv_aeg": 10, "larv_alb": 0, "larv_culex": 0, "larv_total": 10, "larv_aeg_pct": 100}, {"hh_id": "HH-01", "village": "Otakom", "commune": "Toul Ta Ek", "lab_date": "2026-07-03", "month": "2026-07", "year": "2026", "ovi_eggs_indoor": 0, "ovi_eggs_outdoor": 0, "ovi_eggs_total": 0, "bg_aeg_f_in": 0, "bg_aeg_m_in": 0, "bg_alb_f_in": 0, "bg_alb_m_in": 0, "bg_culex_in": 0, "bg_aeg_f_out": 0, "bg_aeg_m_out": 0, "bg_alb_f_out": 0, "bg_alb_m_out": 0, "bg_culex_out": 0, "bg_aeg_total": 0, "bg_alb_total": 0, "bg_culex_total": 0, "bg_adults_total": 0, "bg_aeg_pct": 0, "prok_aeg_female": 0, "prok_aeg_male": 1, "prok_alb_female": 0, "prok_alb_male": 0, "prok_culex": 0, "prok_aeg_total": 1, "prok_alb_total": 0, "prok_adults_total": 1, "prok_aeg_pct": 100, "prok_alb_pct": 0, "larv_aeg": 20, "larv_alb": 0, "larv_culex": 0, "larv_total": 20, "larv_aeg_pct": 100}, {"hh_id": "HH-02", "village": "Otakom", "commune": "Toul Ta Ek", "lab_date": "2026-07-03", "month": "2026-07", "year": "2026", "ovi_eggs_indoor": 0, "ovi_eggs_outdoor": 0, "ovi_eggs_total": 0, "bg_aeg_f_in": 0, "bg_aeg_m_in": 0, "bg_alb_f_in": 0, "bg_alb_m_in": 0, "bg_culex_in": 0, "bg_aeg_f_out": 0, "bg_aeg_m_out": 0, "bg_alb_f_out": 0, "bg_alb_m_out": 0, "bg_culex_out": 0, "bg_aeg_total": 0, "bg_alb_total": 0, "bg_culex_total": 0, "bg_adults_total": 0, "bg_aeg_pct": 0, "prok_aeg_female": 0, "prok_aeg_male": 1, "prok_alb_female": 0, "prok_alb_male": 0, "prok_culex": 0, "prok_aeg_total": 1, "prok_alb_total": 0, "prok_adults_total": 1, "prok_aeg_pct": 100, "prok_alb_pct": 0, "larv_aeg": 10, "larv_alb": 0, "larv_culex": 0, "larv_total": 10, "larv_aeg_pct": 100}, {"hh_id": "HH-03", "village": "Otakom", "commune": "Toul Ta Ek", "lab_date": "2026-07-03", "month": "2026-07", "year": "2026", "ovi_eggs_indoor": 0, "ovi_eggs_outdoor": 0, "ovi_eggs_total": 0, "bg_aeg_f_in": 0, "bg_aeg_m_in": 0, "bg_alb_f_in": 0, "bg_alb_m_in": 0, "bg_culex_in": 0, "bg_aeg_f_out": 0, "bg_aeg_m_out": 0, "bg_alb_f_out": 0, "bg_alb_m_out": 0, "bg_culex_out": 0, "bg_aeg_total": 0, "bg_alb_total": 0, "bg_culex_total": 0, "bg_adults_total": 0, "bg_aeg_pct": 0, "prok_aeg_female": 0, "prok_aeg_male": 0, "prok_alb_female": 0, "prok_alb_male": 0, "prok_culex": 5, "prok_aeg_total": 0, "prok_alb_total": 0, "prok_adults_total": 5, "prok_aeg_pct": 0, "prok_alb_pct": 0, "larv_aeg": 30, "larv_alb": 0, "larv_culex": 0, "larv_total": 30, "larv_aeg_pct": 100}, {"hh_id": "HH-04", "village": "Otakom", "commune": "Toul Ta Ek", "lab_date": "2026-07-03", "month": "2026-07", "year": "2026", "ovi_eggs_indoor": 0, "ovi_eggs_outdoor": 0, "ovi_eggs_total": 0, "bg_aeg_f_in": 0, "bg_aeg_m_in": 0, "bg_alb_f_in": 0, "bg_alb_m_in": 0, "bg_culex_in": 0, "bg_aeg_f_out": 0, "bg_aeg_m_out": 0, "bg_alb_f_out": 0, "bg_alb_m_out": 0, "bg_culex_out": 0, "bg_aeg_total": 0, "bg_alb_total": 0, "bg_culex_total": 0, "bg_adults_total": 0, "bg_aeg_pct": 0, "prok_aeg_female": 1, "prok_aeg_male": 0, "prok_alb_female": 0, "prok_alb_male": 0, "prok_culex": 0, "prok_aeg_total": 1, "prok_alb_total": 0, "prok_adults_total": 1, "prok_aeg_pct": 100, "prok_alb_pct": 0, "larv_aeg": 20, "larv_alb": 0, "larv_culex": 0, "larv_total": 20, "larv_aeg_pct": 100}, {"hh_id": "HH-01", "village": "Toul Ta Ek_v", "commune": "Toul Ta Ek", "lab_date": "2026-07-03", "month": "2026-07", "year": "2026", "ovi_eggs_indoor": 0, "ovi_eggs_outdoor": 0, "ovi_eggs_total": 0, "bg_aeg_f_in": 0, "bg_aeg_m_in": 0, "bg_alb_f_in": 0, "bg_alb_m_in": 0, "bg_culex_in": 0, "bg_aeg_f_out": 0, "bg_aeg_m_out": 0, "bg_alb_f_out": 0, "bg_alb_m_out": 0, "bg_culex_out": 0, "bg_aeg_total": 0, "bg_alb_total": 0, "bg_culex_total": 0, "bg_adults_total": 0, "bg_aeg_pct": 0, "prok_aeg_female": 0, "prok_aeg_male": 0, "prok_alb_female": 0, "prok_alb_male": 0, "prok_culex": 3, "prok_aeg_total": 0, "prok_alb_total": 0, "prok_adults_total": 3, "prok_aeg_pct": 0, "prok_alb_pct": 0, "larv_aeg": 0, "larv_alb": 0, "larv_culex": 0, "larv_total": 0, "larv_aeg_pct": 0}, {"hh_id": "HH-01", "village": "Numkiem", "commune": "Preak Peahsdach", "lab_date": "2026-07-03", "month": "2026-07", "year": "2026", "ovi_eggs_indoor": 0, "ovi_eggs_outdoor": 0, "ovi_eggs_total": 0, "bg_aeg_f_in": 0, "bg_aeg_m_in": 0, "bg_alb_f_in": 0, "bg_alb_m_in": 0, "bg_culex_in": 0, "bg_aeg_f_out": 0, "bg_aeg_m_out": 0, "bg_alb_f_out": 0, "bg_alb_m_out": 0, "bg_culex_out": 0, "bg_aeg_total": 0, "bg_alb_total": 0, "bg_culex_total": 0, "bg_adults_total": 0, "bg_aeg_pct": 0, "prok_aeg_female": 1, "prok_aeg_male": 2, "prok_alb_female": 0, "prok_alb_male": 0, "prok_culex": 0, "prok_aeg_total": 3, "prok_alb_total": 0, "prok_adults_total": 3, "prok_aeg_pct": 100, "prok_alb_pct": 0, "larv_aeg": 16, "larv_alb": 4, "larv_culex": 10, "larv_total": 30, "larv_aeg_pct": 53.3}, {"hh_id": "HH-02", "village": "Numkiem", "commune": "Preak Peahsdach", "lab_date": "2026-07-03", "month": "2026-07", "year": "2026", "ovi_eggs_indoor": 0, "ovi_eggs_outdoor": 0, "ovi_eggs_total": 0, "bg_aeg_f_in": 0, "bg_aeg_m_in": 0, "bg_alb_f_in": 0, "bg_alb_m_in": 0, "bg_culex_in": 0, "bg_aeg_f_out": 0, "bg_aeg_m_out": 0, "bg_alb_f_out": 0, "bg_alb_m_out": 0, "bg_culex_out": 0, "bg_aeg_total": 0, "bg_alb_total": 0, "bg_culex_total": 0, "bg_adults_total": 0, "bg_aeg_pct": 0, "prok_aeg_female": 0, "prok_aeg_male": 0, "prok_alb_female": 0, "prok_alb_male": 0, "prok_culex": 3, "prok_aeg_total": 0, "prok_alb_total": 0, "prok_adults_total": 3, "prok_aeg_pct": 0, "prok_alb_pct": 0, "larv_aeg": 10, "larv_alb": 0, "larv_culex": 0, "larv_total": 10, "larv_aeg_pct": 100}, {"hh_id": "HH-03", "village": "Numkiem", "commune": "Preak Peahsdach", "lab_date": "2026-07-03", "month": "2026-07", "year": "2026", "ovi_eggs_indoor": 0, "ovi_eggs_outdoor": 0, "ovi_eggs_total": 0, "bg_aeg_f_in": 0, "bg_aeg_m_in": 0, "bg_alb_f_in": 0, "bg_alb_m_in": 0, "bg_culex_in": 0, "bg_aeg_f_out": 0, "bg_aeg_m_out": 0, "bg_alb_f_out": 0, "bg_alb_m_out": 0, "bg_culex_out": 0, "bg_aeg_total": 0, "bg_alb_total": 0, "bg_culex_total": 0, "bg_adults_total": 0, "bg_aeg_pct": 0, "prok_aeg_female": 0, "prok_aeg_male": 0, "prok_alb_female": 0, "prok_alb_male": 0, "prok_culex": 4, "prok_aeg_total": 0, "prok_alb_total": 0, "prok_adults_total": 4, "prok_aeg_pct": 0, "prok_alb_pct": 0, "larv_aeg": 20, "larv_alb": 0, "larv_culex": 0, "larv_total": 20, "larv_aeg_pct": 100}, {"hh_id": "HH-04", "village": "Numkiem", "commune": "Preak Peahsdach", "lab_date": "2026-07-03", "month": "2026-07", "year": "2026", "ovi_eggs_indoor": 0, "ovi_eggs_outdoor": 0, "ovi_eggs_total": 0, "bg_aeg_f_in": 0, "bg_aeg_m_in": 0, "bg_alb_f_in": 0, "bg_alb_m_in": 0, "bg_culex_in": 0, "bg_aeg_f_out": 0, "bg_aeg_m_out": 0, "bg_alb_f_out": 0, "bg_alb_m_out": 0, "bg_culex_out": 0, "bg_aeg_total": 0, "bg_alb_total": 0, "bg_culex_total": 0, "bg_adults_total": 0, "bg_aeg_pct": 0, "prok_aeg_female": 2, "prok_aeg_male": 2, "prok_alb_female": 0, "prok_alb_male": 0, "prok_culex": 0, "prok_aeg_total": 4, "prok_alb_total": 0, "prok_adults_total": 4, "prok_aeg_pct": 100, "prok_alb_pct": 0, "larv_aeg": 70, "larv_alb": 20, "larv_culex": 0, "larv_total": 90, "larv_aeg_pct": 77.8}, {"hh_id": "HH-05", "village": "Numkiem", "commune": "Preak Peahsdach", "lab_date": "2026-07-03", "month": "2026-07", "year": "2026", "ovi_eggs_indoor": 0, "ovi_eggs_outdoor": 0, "ovi_eggs_total": 0, "bg_aeg_f_in": 0, "bg_aeg_m_in": 0, "bg_alb_f_in": 0, "bg_alb_m_in": 0, "bg_culex_in": 0, "bg_aeg_f_out": 0, "bg_aeg_m_out": 0, "bg_alb_f_out": 0, "bg_alb_m_out": 0, "bg_culex_out": 0, "bg_aeg_total": 0, "bg_alb_total": 0, "bg_culex_total": 0, "bg_adults_total": 0, "bg_aeg_pct": 0, "prok_aeg_female": 5, "prok_aeg_male": 2, "prok_alb_female": 0, "prok_alb_male": 0, "prok_culex": 6, "prok_aeg_total": 7, "prok_alb_total": 0, "prok_adults_total": 13, "prok_aeg_pct": 53.8, "prok_alb_pct": 0, "larv_aeg": 20, "larv_alb": 0, "larv_culex": 10, "larv_total": 30, "larv_aeg_pct": 66.7}, {"hh_id": "HH-01", "village": "Ocheay", "commune": "Preak Peahsdach", "lab_date": "2026-07-01", "month": "2026-07", "year": "2026", "ovi_eggs_indoor": 0, "ovi_eggs_outdoor": 0, "ovi_eggs_total": 0, "bg_aeg_f_in": 0, "bg_aeg_m_in": 0, "bg_alb_f_in": 0, "bg_alb_m_in": 0, "bg_culex_in": 0, "bg_aeg_f_out": 0, "bg_aeg_m_out": 0, "bg_alb_f_out": 0, "bg_alb_m_out": 0, "bg_culex_out": 0, "bg_aeg_total": 0, "bg_alb_total": 0, "bg_culex_total": 0, "bg_adults_total": 0, "bg_aeg_pct": 0, "prok_aeg_female": 1, "prok_aeg_male": 0, "prok_alb_female": 0, "prok_alb_male": 0, "prok_culex": 2, "prok_aeg_total": 1, "prok_alb_total": 0, "prok_adults_total": 3, "prok_aeg_pct": 33.3, "prok_alb_pct": 0, "larv_aeg": 20, "larv_alb": 0, "larv_culex": 0, "larv_total": 20, "larv_aeg_pct": 100}, {"hh_id": "HH-02", "village": "Ocheay", "commune": "Preak Peahsdach", "lab_date": "2026-07-03", "month": "2026-07", "year": "2026", "ovi_eggs_indoor": 0, "ovi_eggs_outdoor": 0, "ovi_eggs_total": 0, "bg_aeg_f_in": 0, "bg_aeg_m_in": 0, "bg_alb_f_in": 0, "bg_alb_m_in": 0, "bg_culex_in": 0, "bg_aeg_f_out": 0, "bg_aeg_m_out": 0, "bg_alb_f_out": 0, "bg_alb_m_out": 0, "bg_culex_out": 0, "bg_aeg_total": 0, "bg_alb_total": 0, "bg_culex_total": 0, "bg_adults_total": 0, "bg_aeg_pct": 0, "prok_aeg_female": 0, "prok_aeg_male": 0, "prok_alb_female": 0, "prok_alb_male": 0, "prok_culex": 3, "prok_aeg_total": 0, "prok_alb_total": 0, "prok_adults_total": 3, "prok_aeg_pct": 0, "prok_alb_pct": 0, "larv_aeg": 30, "larv_alb": 0, "larv_culex": 0, "larv_total": 30, "larv_aeg_pct": 100}, {"hh_id": "HH-03", "village": "Ocheay", "commune": "Preak Peahsdach", "lab_date": "2026-07-03", "month": "2026-07", "year": "2026", "ovi_eggs_indoor": 0, "ovi_eggs_outdoor": 0, "ovi_eggs_total": 0, "bg_aeg_f_in": 0, "bg_aeg_m_in": 0, "bg_alb_f_in": 0, "bg_alb_m_in": 0, "bg_culex_in": 0, "bg_aeg_f_out": 0, "bg_aeg_m_out": 0, "bg_alb_f_out": 0, "bg_alb_m_out": 0, "bg_culex_out": 0, "bg_aeg_total": 0, "bg_alb_total": 0, "bg_culex_total": 0, "bg_adults_total": 0, "bg_aeg_pct": 0, "prok_aeg_female": 6, "prok_aeg_male": 4, "prok_alb_female": 0, "prok_alb_male": 0, "prok_culex": 1, "prok_aeg_total": 10, "prok_alb_total": 0, "prok_adults_total": 11, "prok_aeg_pct": 90.9, "prok_alb_pct": 0, "larv_aeg": 30, "larv_alb": 0, "larv_culex": 0, "larv_total": 30, "larv_aeg_pct": 100}, {"hh_id": "HH-04", "village": "Ocheay", "commune": "Preak Peahsdach", "lab_date": "2026-07-03", "month": "2026-07", "year": "2026", "ovi_eggs_indoor": 0, "ovi_eggs_outdoor": 0, "ovi_eggs_total": 0, "bg_aeg_f_in": 0, "bg_aeg_m_in": 0, "bg_alb_f_in": 0, "bg_alb_m_in": 0, "bg_culex_in": 0, "bg_aeg_f_out": 0, "bg_aeg_m_out": 0, "bg_alb_f_out": 0, "bg_alb_m_out": 0, "bg_culex_out": 0, "bg_aeg_total": 0, "bg_alb_total": 0, "bg_culex_total": 0, "bg_adults_total": 0, "bg_aeg_pct": 0, "prok_aeg_female": 1, "prok_aeg_male": 1, "prok_alb_female": 0, "prok_alb_male": 0, "prok_culex": 2, "prok_aeg_total": 2, "prok_alb_total": 0, "prok_adults_total": 4, "prok_aeg_pct": 50, "prok_alb_pct": 0, "larv_aeg": 20, "larv_alb": 0, "larv_culex": 0, "larv_total": 20, "larv_aeg_pct": 100}, {"hh_id": "HH-05", "village": "Ocheay", "commune": "Preak Peahsdach", "lab_date": "2026-07-03", "month": "2026-07", "year": "2026", "ovi_eggs_indoor": 0, "ovi_eggs_outdoor": 0, "ovi_eggs_total": 0, "bg_aeg_f_in": 0, "bg_aeg_m_in": 0, "bg_alb_f_in": 0, "bg_alb_m_in": 0, "bg_culex_in": 0, "bg_aeg_f_out": 0, "bg_aeg_m_out": 0, "bg_alb_f_out": 0, "bg_alb_m_out": 0, "bg_culex_out": 0, "bg_aeg_total": 0, "bg_alb_total": 0, "bg_culex_total": 0, "bg_adults_total": 0, "bg_aeg_pct": 0, "prok_aeg_female": 1, "prok_aeg_male": 0, "prok_alb_female": 0, "prok_alb_male": 0, "prok_culex": 1, "prok_aeg_total": 1, "prok_alb_total": 0, "prok_adults_total": 2, "prok_aeg_pct": 50, "prok_alb_pct": 0, "larv_aeg": 24, "larv_alb": 6, "larv_culex": 0, "larv_total": 30, "larv_aeg_pct": 80}, {"hh_id": "HH-05", "village": "Otakom", "commune": "Toul Ta Ek", "lab_date": "2026-07-03", "month": "2026-07", "year": "2026", "ovi_eggs_indoor": 0, "ovi_eggs_outdoor": 0, "ovi_eggs_total": 0, "bg_aeg_f_in": 0, "bg_aeg_m_in": 0, "bg_alb_f_in": 0, "bg_alb_m_in": 0, "bg_culex_in": 0, "bg_aeg_f_out": 0, "bg_aeg_m_out": 0, "bg_alb_f_out": 0, "bg_alb_m_out": 0, "bg_culex_out": 0, "bg_aeg_total": 0, "bg_alb_total": 0, "bg_culex_total": 0, "bg_adults_total": 0, "bg_aeg_pct": 0, "prok_aeg_female": 0, "prok_aeg_male": 0, "prok_alb_female": 0, "prok_alb_male": 0, "prok_culex": 4, "prok_aeg_total": 0, "prok_alb_total": 0, "prok_adults_total": 4, "prok_aeg_pct": 0, "prok_alb_pct": 0, "larv_aeg": 10, "larv_alb": 0, "larv_culex": 0, "larv_total": 10, "larv_aeg_pct": 100}];
+
+// ══════════════════════════════════════════════════════════════════════════
+// CHART REGISTRY
+// ══════════════════════════════════════════════════════════════════════════
+const CHARTS = {};
+const VILLAGE_COLORS = {
+  'Toul Ta Ek':'#2E8FA3','Toul Ta Ek_v':'#2E8FA3','Otakom':'#6DCBBE',
+  'Kamakor':'#0E6655','Kampong Krabei':'#1B5E20','Rumchek':'#E8563A',
+  'Rattanak':'#E8563A','Rattanak_v':'#E8563A','Numkiem':'#7D3C98','Ocheay':'#E67E22'
+};
+const SP_COLORS = ['#E8563A','#2E8FA3','#6DCBBE'];
+const LABEL_COLORS = (n)=>Object.values(VILLAGE_COLORS).slice(0,n);
+
+// State
+let filteredF3 = [...F3_DATA];
+let filteredF2 = [...F2_DATA];
+let sortCol = -1, sortAsc = true;
+
+// ── Helpers ────────────────────────────────────────────────────────────────
+const sum   = (arr, k) => arr.reduce((a,b) => a + (b[k]||0), 0);
+const avg   = (arr, k) => arr.length ? sum(arr,k)/arr.length : 0;
+const uniq  = (arr, k) => [...new Set(arr.map(x=>x[k]).filter(Boolean))].sort();
+const grpBy = (arr, k) => arr.reduce((m,x)=>{ (m[x[k]]=(m[x[k]]||[])).push(x); return m; }, {});
+const fmt   = v => v>=1000 ? (v/1000).toFixed(1)+'k' : v;
+const pct   = v => v.toFixed(1)+'%';
+
+function makeChart(id, cfg) {
+  if (CHARTS[id]) { CHARTS[id].destroy(); }
+  const ctx = document.getElementById(id);
+  if (!ctx) return;
+  CHARTS[id] = new Chart(ctx.getContext('2d'), cfg);
+  return CHARTS[id];
+}
+
+// ── Populate Filters ───────────────────────────────────────────────────────
+function populateFilters() {
+  const communes = uniq(F3_DATA,'commune');
+  const villages = uniq(F3_DATA,'village');
+  const months   = uniq(F3_DATA,'month');
+  const years    = uniq(F3_DATA,'year');
+  const fC = document.getElementById('fCommune');
+  const fV = document.getElementById('fVillage');
+  const fM = document.getElementById('fMonth');
+  const fY = document.getElementById('fYear');
+  communes.forEach(c => fC.add(new Option(c,c)));
+  villages.forEach(v => fV.add(new Option(v,v)));
+  months.forEach(m => fM.add(new Option(m,m)));
+  years.forEach(y => fY.add(new Option(y,y)));
+}
+
+function applyFilters() {
+  const c = document.getElementById('fCommune').value;
+  const v = document.getElementById('fVillage').value;
+  const m = document.getElementById('fMonth').value;
+  const y = document.getElementById('fYear').value;
+  filteredF3 = F3_DATA.filter(r =>
+    (!c || r.commune===c) && (!v || r.village===v) &&
+    (!m || r.month===m)   && (!y || r.year===y)
+  );
+  filteredF2 = F2_DATA.filter(r =>
+    (!c || r.commune===c) && (!v || r.village===v) &&
+    (!m || r.month===m)
+  );
+  document.getElementById('recCount').textContent = `${filteredF3.length} records`;
+  renderAll();
+}
+
+function resetFilters() {
+  ['fCommune','fVillage','fMonth','fYear'].forEach(id => document.getElementById(id).value='');
+  applyFilters();
+}
+
+// ── KPIs ───────────────────────────────────────────────────────────────────
+function renderKPIs() {
+  // Filter F1 by commune/village to match current filters
+  const c = document.getElementById('fCommune').value;
+  const v = document.getElementById('fVillage').value;
+  const filteredF1 = F1_DATA.filter(r =>
+    (!c || r.commune===c) && (!v || (r.village===v || r.village===v+'_v' || r.village===v.replace('_v','')))
+  );
+  const hhs    = filteredF1.length;
+  const visits = filteredF3.length;
+  const ci2Data = filteredF2.filter(r=>r.total_containers>0);
+  const contTotal = sum(filteredF2,'total_containers');
+  const contPos   = sum(filteredF2,'total_positive');
+  // Container Index = pooled ratio (WHO/PAHO standard): positive containers
+  // over ALL containers inspected, not an average of each household's own %.
+  const ci     = contTotal ? (contPos/contTotal*100) : 0;
+  const prok   = sum(filteredF3,'prok_adults_total');
+  const prokAeg = sum(filteredF3,'prok_aeg_total');
+  const larv   = sum(filteredF3,'larv_total');
+  const ovi    = sum(filteredF3,'ovi_eggs_total');
+  const oviIn  = sum(filteredF3,'ovi_eggs_indoor');
+  const oviOut = sum(filteredF3,'ovi_eggs_outdoor');
+  const bgTot  = sum(filteredF3,'bg_adults_total');
+  const bgAeg  = sum(filteredF3,'bg_aeg_total');
+  const bgAlb  = sum(filteredF3,'bg_alb_total');
+  const bgCulex= sum(filteredF3,'bg_culex_total');
+  const meanCI = contTotal ? +(contPos/contTotal*100).toFixed(1) : 0;
+  // House Index = % of households with at least one positive container
+  // (standard entomological definition, distinct from Container Index)
+  const hi = filteredF2.length ? (filteredF2.filter(r=>r.house_index>0).length / filteredF2.length * 100) : 0;
+  const hiCount = filteredF2.filter(r=>r.house_index>0).length;
+  const prokAlb   = sum(filteredF3,'prok_alb_total');
+  const prokCulex = sum(filteredF3,'prok_culex');
+
+  // Overview KPIs
+  document.getElementById('kpi-hh').textContent = hhs;
+  document.getElementById('kpi-hh-sub').textContent = `across ${uniq(filteredF1,'village').length} village(s)`;
+  document.getElementById('kpi-visits').textContent = visits;
+  document.getElementById('kpi-visits-sub').textContent = `${visits} HH result${visits!==1?'s':''}`;
+  document.getElementById('kpi-ci').textContent = ci.toFixed(1)+'%';
+  document.getElementById('kpi-ci').style.color = ci>=20?'#E8563A':ci>=5?'#E8563A':'#1B5E20';
+  document.getElementById('kpi-prok').textContent = fmt(prok);
+  const _prokAlbTot = sum(filteredF3,'prok_alb_total'), _prokCulexTot = sum(filteredF3,'prok_culex');
+  document.getElementById('kpi-prok-sub').textContent = prok>0
+    ? `Ae.aeg: ${prokAeg}(${Math.round(prokAeg/prok*100)}%) | Ae.alb: ${_prokAlbTot}(${Math.round(_prokAlbTot/prok*100)}%) | Culex: ${_prokCulexTot}(${Math.round(_prokCulexTot/prok*100)}%)`
+    : 'no data';
+  document.getElementById('kpi-larv').textContent = fmt(larv);
+  document.getElementById('kpi-larv-sub').textContent = filteredF3.filter(r=>r.larv_total>0).length + ' HHs with larvae';
+  document.getElementById('kpi-ovi').textContent = fmt(ovi);
+  document.getElementById('kpi-ovi-sub').textContent = `Indoor: ${oviIn}  Outdoor: ${oviOut}`;
+
+  
+  // Larval KPIs
+  document.getElementById('kpi-ci2').textContent = ci.toFixed(1)+'%';
+  document.getElementById('kpi-ci2').style.color = ci>=20?'#E8563A':ci>=5?'#E8563A':'#1B5E20';
+  document.getElementById('kpi-ci-high').textContent = hi.toFixed(1)+'%';
+  document.getElementById('kpi-ci-high-sub').textContent = `${hiCount} of ${filteredF2.length} HHs positive`;
+  document.getElementById('kpi-larv2').textContent = fmt(larv);
+  const larvAegN = sum(filteredF3,'larv_aeg'), larvAlbN = sum(filteredF3,'larv_alb'), larvCulexN = sum(filteredF3,'larv_culex');
+  const larvBreakdownTotal = larvAegN + larvAlbN + larvCulexN;
+  document.getElementById('kpi-larv2-sub').textContent = larvBreakdownTotal>0
+    ? `Ae.aeg: ${larvAegN}(${Math.round(larvAegN/larvBreakdownTotal*100)}%) | Ae.alb: ${larvAlbN}(${Math.round(larvAlbN/larvBreakdownTotal*100)}%) | Culex: ${larvCulexN}(${Math.round(larvCulexN/larvBreakdownTotal*100)}%)`
+    : 'species breakdown not available';
+  document.getElementById('kpi-containers').textContent = contTotal;
+  document.getElementById('kpi-containers-sub').textContent = `Positive: ${contPos}`;
+
+  // Prokopack KPIs
+  document.getElementById('kpi-prok2').textContent = fmt(prok);
+  document.getElementById('kpi-prok2-sub').textContent = filteredF3.filter(r=>r.prok_adults_total>0).length + ' HHs with mosquitoes';
+  document.getElementById('kpi-prok-aeg').textContent = prokAeg;
+  const prokAegF = sum(filteredF3,'prok_aeg_female'), prokAegM = sum(filteredF3,'prok_aeg_male');
+  document.getElementById('kpi-prok-aeg-sub').textContent = `F:${prokAegF} M:${prokAegM} | ${prok?Math.round(prokAeg/prok*100):0}% of total`;
+  document.getElementById('kpi-prok-alb').textContent = prokAlb;
+  const prokAlbF = sum(filteredF3,'prok_alb_female'), prokAlbM = sum(filteredF3,'prok_alb_male');
+  document.getElementById('kpi-prok-alb-sub').textContent = `F:${prokAlbF} M:${prokAlbM} | ${prok?Math.round(prokAlb/prok*100):0}% of total`;
+  document.getElementById('kpi-prok-culex').textContent = prokCulex;
+  document.getElementById('kpi-prok-culex-sub').textContent = `${prok?Math.round(prokCulex/prok*100):0}% of total`;
+
+  // BG KPIs
+  document.getElementById('kpi-bg').textContent = bgTot;
+  document.getElementById('kpi-bg-aeg').textContent = bgAeg;
+  document.getElementById('kpi-bg-aeg-pct').textContent = bgTot ? pct(bgAeg/bgTot*100)+' of total' : 'no data';
+  document.getElementById('kpi-bg-alb').textContent = bgAlb;
+  document.getElementById('kpi-bg-culex').textContent = bgCulex;
+
+  // Ovitrap KPIs
+  document.getElementById('kpi-ovi2').textContent = ovi;
+  document.getElementById('kpi-ovi-in').textContent = oviIn;
+  document.getElementById('kpi-ovi-out').textContent = oviOut;
+}
+
+// ── Chart helpers ──────────────────────────────────────────────────────────
+const baseOpts = (title='',who=false) => ({
+  responsive:true, maintainAspectRatio:true,
+  plugins:{
+    legend:{position:'bottom',labels:{font:{size:11},boxWidth:12}},
+    tooltip:{mode:'index',intersect:false},
+    annotation: who ? {
+      annotations:{who:{type:'line',yMin:20,yMax:20,borderColor:'#E8563A',
+        borderWidth:2,borderDash:[6,3],
+        label:{content:'WHO 20%',enabled:true,position:'start',font:{size:10}}}}
+    } : undefined
+  },
+  scales:{y:{beginAtZero:true,ticks:{font:{size:10}}},x:{ticks:{font:{size:10}}}}
+});
+
+const barDS = (label,data,color,stack) => ({
+  label, data, backgroundColor:color+'DD', borderColor:color, borderWidth:1,
+  ...(stack?{stack}:{})
+});
+
+// ── OVERVIEW CHARTS ────────────────────────────────────────────────────────
+function renderOverviewCharts() {
+  const byVil = grpBy(filteredF2,'village');
+  const vils  = Object.keys(byVil).sort();
+
+  // CI by village (pooled: village's total positive / village's total containers)
+  const ciVals = vils.map(v=>{
+    const rows = byVil[v].filter(r=>r.total_containers>0);
+    const vTotal = sum(rows,'total_containers');
+    return vTotal ? +(sum(rows,'total_positive')/vTotal*100).toFixed(1) : 0;
+  });
+  makeChart('chartCIVillage',{type:'bar',
+    data:{labels:vils,datasets:[{label:'CI %',data:ciVals,
+      backgroundColor:ciVals.map(v=>v>=20?'#E8563ADD':v>=5?'#E8563ADD':'#1B5E20CC'),
+      borderColor:ciVals.map(v=>v>=20?'#E8563A':v>=5?'#E8563A':'#1B5E20'),borderWidth:1}]},
+    options:{...baseOpts('CI%',true)}
+  });
+
+  // Species pie (Prokopack)
+  const aeAeg = sum(filteredF3,'prok_aeg_total');
+  const aeAlb = sum(filteredF3,'prok_alb_total');
+  const culex = sum(filteredF3,'prok_culex');
+  makeChart('chartSpeciesPie',{type:'doughnut',
+    data:{labels:['Ae. aegypti','Ae. albopictus','Culex sp.'],
+      datasets:[{data:[aeAeg,aeAlb,culex],backgroundColor:SP_COLORS,borderWidth:2,hoverOffset:8}]},
+    options:{responsive:true,maintainAspectRatio:true,
+      plugins:{
+        legend:{position:'bottom',labels:{font:{size:11},boxWidth:12}},
+        tooltip:{callbacks:{label:ctx=>{
+          const tot=ctx.dataset.data.reduce((a,b)=>a+b,0);
+          const pct=tot>0?(ctx.parsed/tot*100).toFixed(1):0;
+          return ` ${ctx.label}: ${ctx.parsed} (${pct}%)`;
+        }}}
+      }}
+  });
+
+  // Prokopack by village
+  const byVil3 = grpBy(filteredF3,'village');
+  const vils3  = Object.keys(byVil3).sort();
+  makeChart('chartProkVillage',{type:'bar',
+    data:{labels:vils3,datasets:[barDS('Ae. aegypti',vils3.map(v=>sum(byVil3[v],'prok_aeg_total')),'#E8563A'),
+      barDS('Ae. albopictus',vils3.map(v=>sum(byVil3[v],'prok_alb_total')),'#2E8FA3'),
+      barDS('Culex sp.',vils3.map(v=>sum(byVil3[v],'prok_culex')),'#6DCBBE')]},
+    options:{...baseOpts(),scales:{x:{stacked:true,ticks:{font:{size:10}}},y:{stacked:true,beginAtZero:true,ticks:{font:{size:10}}}}}
+  });
+
+  // Larvae by village
+  makeChart('chartLarvVillage',{type:'bar',
+    data:{labels:vils3,datasets:[barDS('Ae.aegypti',vils3.map(v=>sum(byVil3[v],'larv_aeg')),'#E8563A'),
+      barDS('Ae.albopictus',vils3.map(v=>sum(byVil3[v],'larv_alb')),'#6DCBBE'),
+      barDS('Culex',vils3.map(v=>sum(byVil3[v],'larv_culex')),'#FBCA4A')]},
+    options:{...baseOpts(),scales:{x:{stacked:true,ticks:{font:{size:10}}},y:{stacked:true,beginAtZero:true,ticks:{font:{size:10}}}}}
+  });
+}
+
+// ── LARVAL CHARTS ──────────────────────────────────────────────────────────
+function renderLarvalCharts() {
+  const byVil2 = grpBy(filteredF2,'village');
+  const byVil3 = grpBy(filteredF3,'village');
+  const vils2  = Object.keys(byVil2).sort();
+  const vils3  = Object.keys(byVil3).sort();
+
+  // CI by village (pooled: village's total positive / village's total containers)
+  const ciVals = vils2.map(v=>{
+    const rows = byVil2[v].filter(r=>r.total_containers>0);
+    const vTotal = sum(rows,'total_containers');
+    return vTotal ? +(sum(rows,'total_positive')/vTotal*100).toFixed(1) : 0;
+  });
+  makeChart('chartCI2',{type:'bar',
+    data:{labels:vils2,datasets:[{label:'Avg CI %',data:ciVals,
+      backgroundColor:ciVals.map(v=>v>=20?'#E8563ADD':v>=5?'#FBCA4ADD':'#1B5E20CC'),
+      borderWidth:1}]},
+    options:{...baseOpts()}
+  });
+
+  // Larvae species by village (stacked)
+  makeChart('chartLarvSpecies',{type:'bar',
+    data:{labels:vils3,datasets:[barDS('Ae. aegypti',vils3.map(v=>sum(byVil3[v],'larv_aeg')),'#E8563A','sp'),
+      barDS('Ae.albopictus',vils3.map(v=>sum(byVil3[v],'larv_alb')),'#6DCBBE','sp'),
+      barDS('Culex',vils3.map(v=>sum(byVil3[v],'larv_culex')),'#FBCA4A','sp')]},
+    options:{...baseOpts(),scales:{x:{stacked:true,ticks:{font:{size:10}}},y:{stacked:true,beginAtZero:true,ticks:{font:{size:10}}}}}
+  });
+
+  // Containers inspected vs positive
+  makeChart('chartContainers',{type:'bar',
+    data:{labels:vils2,datasets:[
+      barDS('Inspected',vils2.map(v=>sum(byVil2[v],'total_containers')),'#6DCBBE'),
+      barDS('Positive', vils2.map(v=>sum(byVil2[v],'total_positive')), '#E8563A')]},
+    options:baseOpts()
+  });
+}
+
+// ── PROKOPACK CHARTS ───────────────────────────────────────────────────────
+function renderProkCharts() {
+  const byVil = grpBy(filteredF3,'village');
+  const vils  = Object.keys(byVil).sort();
+
+  makeChart('chartProkStack',{type:'bar',
+    data:{labels:vils,datasets:[
+      barDS('Ae. aegypti',vils.map(v=>sum(byVil[v],'prok_aeg_total')),'#E8563A','s'),
+      barDS('Ae. albopictus',vils.map(v=>sum(byVil[v],'prok_alb_total')),'#2E8FA3','s'),
+      barDS('Culex sp.',vils.map(v=>sum(byVil[v],'prok_culex')),'#6DCBBE','s')]},
+    options:{...baseOpts(),scales:{x:{stacked:true,ticks:{font:{size:10}}},y:{stacked:true,beginAtZero:true,ticks:{font:{size:10}}}}}
+  });
+
+  const aegPcts = vils.map(v=>{
+    const rows = byVil[v].filter(r=>r.prok_adults_total>0);
+    return rows.length ? +(sum(rows,'prok_aeg_total')/sum(rows,'prok_adults_total')*100).toFixed(1) : 0;
+  });
+  makeChart('chartProkAegPct',{type:'bar',
+    data:{labels:vils,datasets:[{label:'Ae.aegypti %',data:aegPcts,
+      backgroundColor:aegPcts.map(v=>'#E8563ADD'),borderColor:'#E8563A',borderWidth:1}]},
+    options:baseOpts()
+  });
+
+  makeChart('chartProkFM',{type:'bar',
+    data:{labels:vils,datasets:[
+      barDS('Female',vils.map(v=>sum(byVil[v],'prok_aeg_female')),'#F5923A'),
+      barDS('Male',  vils.map(v=>sum(byVil[v],'prok_aeg_male')),  '#3498DB')]},
+    options:baseOpts()
+  });
+
+  const aeAeg = sum(filteredF3,'prok_aeg_total');
+  const aeAlb = sum(filteredF3,'prok_alb_total');
+  const culex = sum(filteredF3,'prok_culex');
+  makeChart('chartProkDoughnut',{type:'doughnut',
+    data:{labels:['Ae. aegypti','Ae. albopictus','Culex sp.'],
+      datasets:[{data:[aeAeg,aeAlb,culex],backgroundColor:SP_COLORS,borderWidth:2,hoverOffset:8}]},
+    options:{responsive:true,maintainAspectRatio:true,
+      plugins:{
+        legend:{position:'bottom',labels:{font:{size:11},boxWidth:12}},
+        tooltip:{callbacks:{label:ctx=>{
+          const tot=ctx.dataset.data.reduce((a,b)=>a+b,0);
+          const pct=tot>0?(ctx.parsed/tot*100).toFixed(1):0;
+          return ` ${ctx.label}: ${ctx.parsed} (${pct}%)`;
+        }}}
+      }
+    }
+  });
+}
+
+// ── BG CHARTS ──────────────────────────────────────────────────────────────
+function renderBGCharts() {
+  const byVil = grpBy(filteredF3,'village');
+  const vils  = Object.keys(byVil).sort();
+
+  makeChart('chartBGStack',{type:'bar',
+    data:{labels:vils,datasets:[
+      barDS('Ae. aegypti',vils.map(v=>sum(byVil[v],'bg_aeg_total')),'#E8563A','s'),
+      barDS('Ae. albopictus',vils.map(v=>sum(byVil[v],'bg_alb_total')),'#2E8FA3','s'),
+      barDS('Culex sp.',vils.map(v=>sum(byVil[v],'bg_culex_total')),'#6DCBBE','s')]},
+    options:{...baseOpts(),scales:{x:{stacked:true,ticks:{font:{size:10}}},y:{stacked:true,beginAtZero:true,ticks:{font:{size:10}}}}}
+  });
+
+  makeChart('chartBGInOut',{type:'bar',
+    data:{labels:vils,datasets:[
+      barDS('Indoor', vils.map(v=>sum(byVil[v],'bg_aeg_female_in')+sum(byVil[v],'bg_aeg_male_in')+sum(byVil[v],'bg_alb_female_in')+sum(byVil[v],'bg_alb_male_in')+sum(byVil[v],'bg_culex_in')),'#2E8FA3'),
+      barDS('Outdoor',vils.map(v=>sum(byVil[v],'bg_aeg_female_out')+sum(byVil[v],'bg_aeg_male_out')+sum(byVil[v],'bg_alb_female_out')+sum(byVil[v],'bg_alb_male_out')+sum(byVil[v],'bg_culex_out')),'#6DCBBE')]},
+    options:baseOpts()
+  });
+}
+
+// ── OVITRAP CHARTS ─────────────────────────────────────────────────────────
+function renderOviCharts() {
+  const byVil = grpBy(filteredF3,'village');
+  const vils  = Object.keys(byVil).sort();
+
+  makeChart('chartOviVillage',{type:'bar',
+    data:{labels:vils,datasets:[
+      barDS('Indoor', vils.map(v=>sum(byVil[v],'ovi_eggs_indoor')), '#E8563A'),
+      barDS('Outdoor',vils.map(v=>sum(byVil[v],'ovi_eggs_outdoor')),'#FBCA4A')]},
+    options:baseOpts()
+  });
+
+  const totalIn  = sum(filteredF3,'ovi_eggs_indoor');
+  const totalOut = sum(filteredF3,'ovi_eggs_outdoor');
+  makeChart('chartOviPie',{type:'doughnut',
+    data:{labels:['Indoor','Outdoor'],
+      datasets:[{data:[totalIn,totalOut],backgroundColor:['#E8563ADD','#FBCA4ADD'],borderWidth:2}]},
+    options:{responsive:true,maintainAspectRatio:true,plugins:{legend:{position:'bottom',labels:{font:{size:11},boxWidth:12}}}}
+  });
+}
+
+// ── TABLE ──────────────────────────────────────────────────────────────────
+function renderTable() {
+  const tbody = document.getElementById('tableBody');
+  tbody.innerHTML = '';
+  // Merge F3 with F2 CI data
+  const f2map = {};
+  filteredF2.forEach(r=>{ f2map[r.hh_id+'_'+r.village] = r; });
+  const rows = filteredF3.map(r=>{
+    const f2 = f2map[r.hh_id+'_'+r.village.replace('_V','_v')] || {};
+    return {...r, container_index: f2.container_index||0};
+  });
+  const sorted = sortCol>=0 ? [...rows].sort((a,b)=>{
+    const keys=['hh_id','village','commune','lab_date','ovi_eggs_total','bg_adults_total','prok_adults_total','prok_aeg_pct','larv_total','larv_aeg_pct','container_index'];
+    const k=keys[sortCol]; const va=a[k]||0, vb=b[k]||0;
+    return sortAsc ? (va>vb?1:-1) : (va<vb?1:-1);
+  }) : rows;
+
+  sorted.forEach(r=>{
+    const ci = r.container_index||0;
+    const ciBadge = ci>=20?'badge-high':ci>=5?'badge-mid':'badge-low';
+    tbody.insertAdjacentHTML('beforeend',`<tr>
+      <td>${r.hh_id}</td>
+      <td>${r.village}</td>
+      <td>${r.commune}</td>
+      <td>${r.lab_date||'—'}</td>
+      <td>${r.ovi_eggs_total||0}</td>
+      <td>${r.bg_adults_total||0}</td>
+      <td>${r.prok_adults_total||0}</td>
+      <td>${r.prok_adults_total>0?r.prok_aeg_pct.toFixed(1)+'%':'—'}</td>
+      <td>${r.larv_total||0}</td>
+      <td>${r.larv_total>0?r.larv_aeg_pct.toFixed(1)+'%':'—'}</td>
+      <td><span class="badge ${ciBadge}">${ci>0?ci.toFixed(1)+'%':'—'}</span></td>
+    </tr>`);
+  });
+}
+
+function sortTable(col) {
+  if(sortCol===col) sortAsc=!sortAsc; else { sortCol=col; sortAsc=true; }
+  renderTable();
+}
+
+// ── Tab switching ──────────────────────────────────────────────────────────
+function switchTab(id) {
+  // init map on first open
+  if(id==='map' && !window._mapInited){ initMap(); window._mapInited=true; }
+  document.querySelectorAll('.tab,.tab-content').forEach(el=>{
+    el.classList.remove('active');
+  });
+  document.querySelectorAll('.tab')[['overview','larval','prokopack','bg','ovitrap','container','map','hh','table'].indexOf(id)].classList.add('active');
+  document.getElementById('tab-'+id).classList.add('active');
+}
+
+// ── Google Sheets loader ───────────────────────────────────────────────────
+// ── Link Modal ────────────────────────────────────────────────────────────
+function showLinkModal() {
+  // Pre-fill with saved values
+  document.getElementById('modalUrlF1').value = localStorage.getItem('gsUrlF1')||document.getElementById('gsUrlF1').value||'';
+  document.getElementById('modalUrlF2').value = localStorage.getItem('gsUrlF2')||document.getElementById('gsUrlF2').value||'';
+  document.getElementById('modalUrlF3').value = localStorage.getItem('gsUrlF3')||document.getElementById('gsUrlF3').value||'';
+  const modal = document.getElementById('linkModal');
+  modal.style.display = 'flex';
+  document.getElementById('modalUrlF3').focus();
+}
+function closeLinkModal() {
+  document.getElementById('linkModal').style.display = 'none';
+}
+function saveAndLoad() {
+  const f1 = document.getElementById('modalUrlF1').value.trim();
+  const f2 = document.getElementById('modalUrlF2').value.trim();
+  const f3 = document.getElementById('modalUrlF3').value.trim();
+  if (!f3) { alert('Please paste the Form 3+4 CSV URL'); return; }
+  document.getElementById('gsUrlF1').value = f1;
+  document.getElementById('gsUrlF2').value = f2;
+  document.getElementById('gsUrlF3').value = f3;
+  try {
+    localStorage.setItem('gsUrlF1', f1);
+    localStorage.setItem('gsUrlF2', f2);
+    localStorage.setItem('gsUrlF3', f3);
+  } catch(e){}
+  closeLinkModal();
+  loadFromGSheets();
+}
+// Close modal on backdrop click
+document.addEventListener('click', e => {
+  const modal = document.getElementById('linkModal');
+  if (e.target === modal) closeLinkModal();
+});
+// Restore saved URLs on load
+document.addEventListener('DOMContentLoaded', () => {
+  try {
+    const f1 = localStorage.getItem('gsUrlF1');
+    const f2 = localStorage.getItem('gsUrlF2');
+    const f3 = localStorage.getItem('gsUrlF3');
+    if (f1) document.getElementById('gsUrlF1').value = f1;
+    if (f2) document.getElementById('gsUrlF2').value = f2;
+    if (f3) {
+      document.getElementById('gsUrlF3').value = f3;
+      document.getElementById('syncStatus').textContent = '🔗 Links saved — click 🔄 Load Data to refresh';
+    }
+  } catch(e){}
+});
+
+async function loadFromGSheets() {
+  const urlF3 = document.getElementById('gsUrlF3').value.trim();
+  const urlF2 = document.getElementById('gsUrlF2').value.trim();
+  if (!urlF3) { alert('Please paste the Form3_Collection_Lab CSV URL'); return; }
+
+  const status = document.getElementById('syncStatus');
+  status.textContent = '⏳ Loading…';
+
+  // ── Helper: parse CSV text → array of objects ──────────────────────────
+  function parseCSV(text) {
+    const lines = text.split('\n');
+    const headers = lines[0].split(',').map(h=>h.trim().replace(/"/g,''));
+    return lines.slice(1).filter(r=>r.trim().length>5).map(row=>{
+      const vals = row.match(/(".*?"|[^,]+|(?<=,)(?=,)|^(?=,)|(?<=,)$)/g)||row.split(',');
+      const obj={};
+      headers.forEach((h,i)=>{ obj[h]=(vals[i]||'').trim().replace(/^"|"$/g,''); });
+      return obj;
+    });
+  }
+
+  // Convert Google Sheets URL to direct export URL if needed
+  function toCSVUrl(url) {
+    // Already a pub CSV URL — use as is
+    if (url.includes('output=csv') || url.includes('pub?')) return url;
+    // Convert /edit or /view URL to CSV export
+    const match = url.match(/spreadsheets\/d\/([a-zA-Z0-9-_]+)/);
+    const gid   = url.match(/gid=([0-9]+)/);
+    if (match) {
+      return `https://docs.google.com/spreadsheets/d/${match[1]}/export?format=csv${gid?'&gid='+gid[1]:''}`;
+    }
+    return url;
+  }
+
+  const csvF1 = urlF1 ? toCSVUrl(urlF1) : '';
+  const csvF2 = urlF2 ? toCSVUrl(urlF2) : '';
+  const csvF3 = toCSVUrl(urlF3);
+
+  try {
+    // ── Load Form 3 ────────────────────────────────────────────────────────
+    const resF3 = await fetch(csvF3, { mode:'cors' });
+    if (!resF3.ok) throw new Error('Form3 HTTP '+resF3.status);
+    const rawF3 = parseCSV(await resF3.text());
+
+    const mappedF3 = rawF3.map(r=>({
+      hh_id:   r.hh_id||r['🔍 Select Household ID']||'',
+      village: (r.village||r['🏘️ Village']||'').replace('_V','_v'),
+      commune: r.commune||r['🗺️ Commune']||'',
+      lab_date:(r.lab_date||r['🔬 Lab Result Date']||'').substring(0,10),
+      month:   (r.lab_date||r['🔬 Lab Result Date']||'').substring(0,7),
+      year:    (r.lab_date||r['🔬 Lab Result Date']||'').substring(0,4),
+      // Ovitrap
+      ovi_eggs_indoor:  +r['🥚 Eggs Indoor']||+r.ovi_eggs_indoor||0,
+      ovi_eggs_outdoor: +r['🥚 Eggs Outdoor']||+r.ovi_eggs_outdoor||0,
+      ovi_eggs_total:   +r.ovi_eggs_total||0,
+      // BG
+      bg_aeg_total:    +r.bg_aeg_total||0,
+      bg_alb_total:    +r.bg_alb_total||0,
+      bg_culex_total:  +r.bg_culex_total||0,
+      bg_adults_total: +r.bg_adults_total||0,
+      bg_aeg_pct:      +r.bg_aeg_pct||0,
+      bg_aeg_female_in:+r.bg_aeg_f_in||0, bg_aeg_male_in:+r.bg_aeg_m_in||0,
+      bg_aeg_female_out:+r.bg_aeg_f_out||0, bg_aeg_male_out:+r.bg_aeg_m_out||0,
+      bg_alb_female_in:+r.bg_alb_f_in||0, bg_alb_male_in:+r.bg_alb_m_in||0,
+      bg_alb_female_out:+r.bg_alb_f_out||0, bg_alb_male_out:+r.bg_alb_m_out||0,
+      bg_culex_in:+r.bg_culex_in||0, bg_culex_out:+r.bg_culex_out||0,
+      // Prokopack
+      prok_aeg_female:  +r['🦟 Ae. aegypti Female']||+r.prok_aeg_female||0,
+      prok_aeg_male:    +r['🦟 Ae. aegypti Male']||+r.prok_aeg_male||0,
+      prok_alb_female:  +r['🦟 Ae. albopictus Female']||+r.prok_alb_female||0,
+      prok_alb_male:    +r['🦟 Ae. albopictus Male']||+r.prok_alb_male||0,
+      prok_culex:       +r['🦟 Culex sp. total']||+r.prok_culex_total||+r.prok_culex||0,
+      prok_aeg_total:   +r.prok_aegypti_total||+r.prok_aeg_total||0,
+      prok_alb_total:   +r.prok_alb_total||0,
+      prok_adults_total:+r.prok_adults_total||0,
+      prok_aeg_pct:     +r.prok_aeg_pct||0,
+      prok_alb_pct:     +r.prok_alb_pct||0,
+      // Larvae
+      larv_aeg:   +r['🦟 Larvae — Ae. aegypti']||+r.larv_aeg||0,
+      larv_alb:   +r['🦟 Larvae — Ae. albopictus']||+r.larv_alb||0,
+      larv_culex: +r['🦟 Larvae — Culex sp.']||+r.larv_culex||0,
+      larv_total: +r.larvae_total||+r.larv_total||0,
+      larv_aeg_pct:+r.larvae_aeg_pct||+r.larv_aeg_pct||0,
+    }));
+
+    F3_DATA.splice(0, F3_DATA.length, ...mappedF3);
+    let statusMsg = `✅ Form 3: ${mappedF3.length} records`;
+
+    // ── Load Form 1 (optional) ─────────────────────────────────────────────
+    if (csvF1) {
+      try {
+        const resF1 = await fetch(csvF1, { mode:'cors' });
+        if (!resF1.ok) throw new Error('Form1 HTTP '+resF1.status);
+        const rawF1 = parseCSV(await resF1.text());
+        const mappedF1 = rawF1.map(r=>({
+          hh_id:    r.hh_id||r['🔍 Select Household ID']||'',
+          village:  (r.village||r['🏘️ Village']||'').replace('_V','_v'),
+          commune:  r.commune||r['🗺️ Commune']||'',
+          hh_code:  r.hh_code||r['🔢 HH Code']||'',
+          lat:      parseFloat(r.latitude||r['_📍 GPS Location_latitude'])||null,
+          lon:      parseFloat(r.longitude||r['_📍 GPS Location_longitude'])||null,
+        })).filter(r=>r.hh_id);
+        F1_DATA.splice(0, F1_DATA.length, ...mappedF1);
+        statusMsg += ` · Form 1: ${mappedF1.length}`;
+      } catch(e) { console.warn('Form 1 load failed:', e.message); }
+    }
+    status.textContent = statusMsg;
+
+    // ── Load Form 2 (optional) ─────────────────────────────────────────────
+    if (csvF2) {
+      const resF2 = await fetch(csvF2, { mode:'cors' });
+      if (!resF2.ok) throw new Error('Form2 HTTP '+resF2.status);
+      const rawF2 = parseCSV(await resF2.text());
+
+      const mappedF2 = rawF2.map(r=>({
+        hh_id:   r.hh_id||r.search_id||'',
+        village: (r.village||r.filter_village||'').replace('_V','_v'),
+        commune: r.commune||'',
+        install_date: (r.install_date||'').substring(0,10),
+        month:   (r.install_date||'').substring(0,7),
+        num_large:   +r.num_large||+r.num_container_10Lmore||0,
+        pos_large:   +r.pos_large||+r.pos_container_10Lmore||0,
+        num_small:   +r.num_small||+r.num_jars_10L_less||0,
+        pos_small:   +r.pos_small||+r.pos_jars_10L_less||0,
+        num_discards:+r.num_discards||0,
+        pos_discards:+r.pos_discards||0,
+        total_containers:+r.total_containers||0,
+        total_positive:  +r.total_positive||0,
+        container_index: +r.container_index||0,
+        house_index:     +r.house_index||0,
+        larval_installed: r.larval_installed==='yes'||r.larval_installed===true,
+        prokopack_planned:r.prokopack_planned==='yes'||r.prokopack_planned===true,
+      }));
+
+      F2_DATA.splice(0, F2_DATA.length, ...mappedF2);
+      statusMsg += ` · Form 2: ${mappedF2.length}`;
+    status.textContent = statusMsg + ' — loaded ✅';
+    }
+
+    // Rebuild filters with new data
+    const fV = document.getElementById('fVillage');
+    const fC = document.getElementById('fCommune');
+    const fM = document.getElementById('fMonth');
+    fV.innerHTML = '<option value="">All Villages</option>';
+    fC.innerHTML = '<option value="">All Communes</option>';
+    fM.innerHTML = '<option value="">All Months</option>';
+    uniq(F3_DATA,'village').forEach(v => fV.add(new Option(v,v)));
+    uniq(F3_DATA,'commune').forEach(c => fC.add(new Option(c,c)));
+    uniq(F3_DATA,'month').forEach(m => fM.add(new Option(m,m)));
+
+    document.getElementById('lastUpdated').textContent = 'Last updated: '+new Date().toLocaleString();
+    applyFilters();
+
+  } catch(e) {
+    status.textContent = '❌ Error: '+e.message;
+    console.error(e);
+    // Show helpful message in modal if CORS issue
+    if (e.message.includes('fetch') || e.message.includes('CORS') || e.message.includes('Failed')) {
+      const tip = document.createElement('div');
+      tip.style.cssText = 'background:#FEF9E0;border:1px solid #F59E0B;border-radius:8px;padding:12px 16px;margin-top:12px;font-size:12px;color:#78350F;line-height:1.6';
+      tip.innerHTML = `<strong>⚠️ Cannot fetch from browser</strong><br>
+        Make sure the Google Sheet is published:<br>
+        1. Open Google Sheet<br>
+        2. File → Share → <strong>Publish to web</strong><br>
+        3. Select the sheet tab → <strong>CSV</strong> → <strong>Publish</strong><br>
+        4. Copy the URL that ends with <code>output=csv</code><br><br>
+        Also make sure you are running from <strong>http://localhost:8080</strong> not file://`;
+      const modal = document.getElementById('linkModal');
+      modal.style.display = 'flex';
+      // Add tip to modal if not already there
+      const modalBox = modal.querySelector('div');
+      if (!modalBox.querySelector('.fetch-tip')) {
+        tip.className = 'fetch-tip';
+        modalBox.appendChild(tip);
+      }
+    }
+  }
+}
+
+
+function useEmbedded() {
+  F3_DATA.splice(0,F3_DATA.length,...[{"hh_id":"HH-01","village":"Kamakor","commune":"Svay Por","lab_date":"2026-07-03","month":"2026-07","year":"2026","ovi_eggs_total":0,"bg_aeg_total":0,"bg_alb_total":0,"bg_culex_total":0,"bg_adults_total":0,"bg_aeg_pct":0,"prok_aeg_female":0,"prok_aeg_male":0,"prok_alb_female":0,"prok_alb_male":0,"prok_culex":0,"prok_aeg_total":0,"prok_alb_total":0,"prok_adults_total":0,"prok_aeg_pct":0,"larv_aeg":20,"larv_alb":0,"larv_culex":0,"larv_total":20,"larv_aeg_pct":100,"ovi_eggs_indoor":0,"ovi_eggs_outdoor":0},{"hh_id":"HH-02","village":"Kamakor","commune":"Svay Por","lab_date":"2026-07-03","month":"2026-07","year":"2026","ovi_eggs_total":0,"bg_aeg_total":0,"bg_alb_total":0,"bg_culex_total":0,"bg_adults_total":0,"bg_aeg_pct":0,"prok_aeg_female":1,"prok_aeg_male":0,"prok_alb_female":0,"prok_alb_male":0,"prok_culex":14,"prok_aeg_total":1,"prok_alb_total":0,"prok_adults_total":15,"prok_aeg_pct":6.7,"larv_aeg":0,"larv_alb":0,"larv_culex":0,"larv_total":0,"larv_aeg_pct":0,"ovi_eggs_indoor":0,"ovi_eggs_outdoor":0}]);
+  filteredF3=[...F3_DATA]; applyFilters();
+  document.getElementById('syncStatus').textContent='📊 Using embedded data';
+}
+
+
+// ── CONTAINER INDEX CHARTS ────────────────────────────────────────────────
+function renderContainerCharts() {
+  const f2 = filteredF2;
+  const byVil = grpBy(f2, 'village');
+  const vils  = Object.keys(byVil).sort();
+
+  // KPIs
+  const totInsp = sum(f2,'total_containers');
+  const totPos  = sum(f2,'total_positive');
+  // Container Index = pooled ratio (WHO/PAHO standard), not an average of
+  // each household's own %.
+  const ci = totInsp ? (totPos/totInsp*100) : 0;
+  const hiHH    = f2.filter(r=>r.house_index>0).length;
+  // House Index = % of households with at least one positive container
+  const hi = f2.length ? (hiHH / f2.length * 100) : 0;
+
+  document.getElementById('kpi-ci3').textContent = ci.toFixed(1)+'%';
+  document.getElementById('kpi-ci3').style.color = ci>=20?'#E8563A':ci>=5?'#E8563A':'#1B5E20';
+  document.getElementById('kpi-ci-high3').textContent = hi.toFixed(1)+'%';
+  document.getElementById('kpi-ci-high3-sub').textContent = `${hiHH} of ${f2.length} HHs positive`;
+  document.getElementById('kpi-total-cont').textContent = totInsp;
+  const posPct = totInsp>0 ? (totPos/totInsp*100).toFixed(1) : 0;
+  document.getElementById('kpi-total-cont-sub').textContent = `Positive: ${totPos} (${posPct}%)`;
+  document.getElementById('kpi-hi').textContent = hiHH;
+  document.getElementById('kpi-hi-sub').textContent = `out of ${f2.length} HHs`;
+
+  // CI by village with WHO line (pooled ratio per village)
+  const ciVals = vils.map(v=>{
+    const rows = byVil[v].filter(r=>r.total_containers>0);
+    const vTotal = sum(rows,'total_containers');
+    return vTotal ? +(sum(rows,'total_positive')/vTotal*100).toFixed(1) : 0;
+  });
+  makeChart('chartCI3',{type:'bar',
+    data:{labels:vils, datasets:[{
+      label:'Avg CI %', data:ciVals,
+      backgroundColor:ciVals.map(v=>v>=20?'#E8563ADD':v>=5?'#FBCA4ADD':'#1B5E20CC'),
+      borderColor:ciVals.map(v=>v>=20?'#E8563A':v>=5?'#FBCA4A':'#1B5E20'),
+      borderWidth:2
+    }]},
+    options:{...baseOpts(),
+      scales:{x:{ticks:{font:{size:10}}},y:{beginAtZero:true,ticks:{font:{size:10}},
+        title:{display:true,text:'Container Index (%)',font:{size:10}}}}
+    }
+  });
+
+
+  // Individual container type charts
+  for (const [cid, numK, posK, color, posColor] of [
+    ['chartLarge',   'num_large',   'pos_large',   '#2E8FA3','#E8563A'],
+    ['chartSmall',   'num_small',   'pos_small',   '#6DCBBE','#F5923A'],
+    ['chartDiscards','num_discards','pos_discards', '#FBCA4A','#E8563A'],
+  ]) {
+    makeChart(cid,{type:'bar',
+      data:{labels:vils, datasets:[
+        {label:'Inspected', data:vils.map(v=>sum(byVil[v],numK)), backgroundColor:color+'DD', borderColor:color, borderWidth:1},
+        {label:'Positive',  data:vils.map(v=>sum(byVil[v],posK)), backgroundColor:posColor+'CC', borderColor:posColor, borderWidth:1},
+      ]},
+      options:baseOpts()
+    });
+  }
+
+  // Detail table
+  const tbody = document.getElementById('ciTableBody');
+  tbody.innerHTML = '';
+  [...f2].sort((a,b)=>b.container_index-a.container_index).forEach(r=>{
+    const ci = r.container_index||0;
+    const badge = ci>=20?'badge-high':ci>=5?'badge-mid':'badge-low';
+    tbody.insertAdjacentHTML('beforeend',`<tr>
+      <td>${r.hh_id}</td>
+      <td>${r.village.replace('_v','').replace('_V','')}</td>
+      <td>${r.commune}</td>
+      <td>${r.num_large||0}</td><td>${r.pos_large||0}</td>
+      <td>${r.num_small||0}</td><td>${r.pos_small||0}</td>
+      <td>${r.num_discards||0}</td><td>${r.pos_discards||0}</td>
+      <td><strong>${r.total_containers||0}</strong></td>
+      <td><strong>${r.total_positive||0}</strong></td>
+      <td><span class="badge ${badge}">${ci>0?ci.toFixed(1)+'%':'0%'}</span></td>
+      <td>${r.house_index>0?r.house_index.toFixed(0)+'%':'0%'}</td>
+    </tr>`);
+  });
+}
+
+
+
+// ══════════════════════════════════════════════════════════════════════════
+// MAP
+// ══════════════════════════════════════════════════════════════════════════
+let _map=null, _mapMode='ci', _markers=[];
+
+const VILLAGE_COLORS_MAP = {
+  'Toul Ta Ek_v':'#2E8FA3','Toul Ta Ek':'#2E8FA3',
+  'Otakom':'#6DCBBE','Kamakor':'#0E6655',
+  'Kampong Krabei':'#1B5E20','Rumchek':'#E8563A',
+  'Rattanak':'#E8563A','Rattanak_v':'#E8563A',
+  'Numkiem':'#7D3C98','Ocheay':'#E67E22'
+};
+
+function ciColor(ci){
+  if(!ci||ci===0) return '#3498DB';
+  if(ci>=20) return '#E8563A';
+  if(ci>=5)  return '#FBCA4A';
+  return '#6DCBBE';
+}
+function valueColor(v, max){
+  if(!v||v===0) return '#3498DB';
+  const pct = v/max;
+  if(pct>=0.66) return '#E8563A';
+  if(pct>=0.33) return '#FBCA4A';
+  return '#6DCBBE';
+}
+
+function makeCircle(lat,lon,color,radius,popup){
+  return L.circleMarker([lat,lon],{
+    radius, color:'#fff', weight:1.5,
+    fillColor:color, fillOpacity:0.85
+  }).bindPopup(popup, {maxWidth:260});
+}
+
+function initMap(){
+  _map = L.map('map').setView([13.093,103.198],13);
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{
+    maxZoom:19,
+    attribution:'© <a href="https://openstreetmap.org">OpenStreetMap</a>'
+  }).addTo(_map);
+  renderMapMarkers();
+}
+
+function setMapMode(mode){
+  _mapMode = mode;
+  document.querySelectorAll('.map-ctrl-btn').forEach(b=>b.classList.remove('active'));
+  event.target.classList.add('active');
+  renderMapMarkers();
+}
+
+function renderMapMarkers(){
+  if(!_map) return;
+  _markers.forEach(m=>m.remove());
+  _markers=[];
+
+  // Use filtered data for map markers
+  const f2map={};
+  filteredF2.forEach(r=>{ f2map[r.hh_id+'_'+r.village]=r; });
+  const f3map={};
+  filteredF3.forEach(r=>{
+    const key=r.hh_id+'_'+r.village;
+    if(!f3map[key]||r.lab_date>f3map[key].lab_date) f3map[key]=r;
+  });
+
+  // Max values for scaling
+  const maxProk = Math.max(1,...F3_DATA.map(r=>r.prok_adults_total||0));
+  const maxLarv = Math.max(1,...F3_DATA.map(r=>r.larv_total||0));
+
+  const legendItems=[];
+
+  F1_DATA.forEach(hh=>{
+    if(!hh.lat||!hh.lon) return;
+    const key = hh.hh_id+'_'+hh.village;
+    const f2  = f2map[key]||{};
+    const f3  = f3map[key]||{};
+    const ci  = parseFloat(f2.container_index)||0;
+    const prok= f3.prok_adults_total||0;
+    const larv= f3.larv_total||0;
+    const vilLabel = hh.village.replace('_v','').replace('_V','');
+
+    let color, radius, legendKey, tooltipVal;
+    if(_mapMode==='ci'){
+      color=ciColor(ci); radius=ci>0?7+ci/8:6;
+      tooltipVal=`CI: ${ci>0?ci.toFixed(1)+'%':'No data'}`;
+      legendKey='ci';
+    } else if(_mapMode==='prok'){
+      color=valueColor(prok,maxProk); radius=prok>0?7+prok/maxProk*10:6;
+      tooltipVal=`Prokopack: ${prok} adults`;
+      legendKey='value';
+    } else if(_mapMode==='larv'){
+      color=valueColor(larv,maxLarv); radius=larv>0?7+larv/maxLarv*10:6;
+      tooltipVal=`Larvae: ${larv}`;
+      legendKey='value';
+    } else {
+      color=VILLAGE_COLORS_MAP[hh.village]||'#6DCBBE'; radius=8;
+      tooltipVal=vilLabel;
+      legendKey='village';
+    }
+
+    // Build species detail strings for popup
+    const prokStr = prok>0
+      ? `${prok} adults<br><span style="font-size:10px;color:#555">
+          Ae.aeg: ${f3.prok_aeg_total||0} &nbsp;|&nbsp;
+          Ae.alb: ${f3.prok_alb_total||0} &nbsp;|&nbsp;
+          Culex: ${f3.prok_culex||0}</span>`
+      : '<span style="color:#aaa">No data</span>';
+    const larvStr = larv>0
+      ? `${larv} larvae<br><span style="font-size:10px;color:#555">
+          Ae.aeg: ${f3.larv_aeg||0} &nbsp;|&nbsp;
+          Ae.alb: ${f3.larv_alb||0} &nbsp;|&nbsp;
+          Culex: ${f3.larv_culex||0}</span>`
+      : '<span style="color:#aaa">No data</span>';
+    const bgStr = (f3.bg_adults_total||0)>0
+      ? `${f3.bg_adults_total} adults<br><span style="font-size:10px;color:#555">
+          Ae.aeg: ${f3.bg_aeg_total||0} &nbsp;|&nbsp;
+          Ae.alb: ${f3.bg_alb_total||0} &nbsp;|&nbsp;
+          Culex: ${f3.bg_culex_total||0}</span>`
+      : '<span style="color:#aaa">No data</span>';
+    const ciStr = ci>0
+      ? `<span style="color:${ciColor(ci)};font-weight:600">${ci.toFixed(1)}%</span>`
+      : '<span style="color:#aaa">No data</span>';
+    const contStr = f2.total_containers>0
+      ? `${f2.total_containers} insp / ${f2.total_positive} pos`
+      : '<span style="color:#aaa">No data</span>';
+
+    const popup=`
+      <div style="font-family:Arial;font-size:12px;min-width:220px">
+        <div style="background:${color};color:#fff;padding:8px 12px;border-radius:6px 6px 0 0;font-weight:700;margin:-8px -8px 8px;display:flex;justify-content:space-between;align-items:center">
+          <span>🏠 ${hh.hh_id} — ${vilLabel}</span>
+          <span style="font-size:10px;opacity:.8">${hh.commune}</span>
+        </div>
+        <table style="width:100%;border-collapse:collapse">
+          <tr><td style="color:#666;padding:3px 0;font-size:11px">📋 HH Code</td>
+              <td style="font-weight:600">${hh.hh_code||'—'}</td></tr>
+          <tr style="border-top:1px solid #f0f0f0">
+              <td style="color:#666;padding:3px 0;font-size:11px">🪣 Container Index</td>
+              <td>${ciStr}</td></tr>
+          <tr><td style="color:#666;padding:3px 0;font-size:11px">🪣 Containers</td>
+              <td>${contStr}</td></tr>
+          <tr style="border-top:1px solid #f0f0f0">
+              <td style="color:#666;padding:3px 0;font-size:11px;vertical-align:top">🦟 Prokopack</td>
+              <td>${prokStr}</td></tr>
+          <tr style="border-top:1px solid #f0f0f0">
+              <td style="color:#666;padding:3px 0;font-size:11px;vertical-align:top">🔬 Larvae</td>
+              <td>${larvStr}</td></tr>
+          <tr style="border-top:1px solid #f0f0f0">
+              <td style="color:#666;padding:3px 0;font-size:11px;vertical-align:top">🕷️ BG-Sentinel</td>
+              <td>${bgStr}</td></tr>
+          <tr style="border-top:1px solid #f0f0f0">
+              <td style="color:#666;padding:3px 0;font-size:11px">📍 GPS</td>
+              <td style="font-size:10px">${hh.lat.toFixed(5)}, ${hh.lon.toFixed(5)}</td></tr>
+        </table>
+        <a href="https://maps.google.com/?q=${hh.lat},${hh.lon}" target="_blank"
+          style="display:block;text-align:center;margin-top:8px;padding:5px;
+          background:#EBF3FB;border-radius:4px;color:#1A3A5C;
+          font-weight:600;font-size:11px;text-decoration:none">
+          🗺️ Open in Google Maps
+        </a>
+      </div>`;
+
+    const m = makeCircle(hh.lat,hh.lon,color,radius,popup).addTo(_map);
+    _markers.push(m);
+  });
+
+  // Legend
+  const legend = document.getElementById('mapLegend');
+  legend.innerHTML='';
+  if(_mapMode==='ci'){
+    [['#1B5E20','CI < 5% (Low)'],['#FBCA4A','CI 5–20% (Moderate)'],
+     ['#E8563A','CI ≥ 20% (High — WHO threshold)'],['#3498DB','No data']].forEach(([c,l])=>{
+      legend.innerHTML+=`<div class="map-legend-item"><div class="map-dot" style="background:${c}"></div>${l}</div>`;
+    });
+  } else if(_mapMode==='prok'||_mapMode==='larv'){
+    const lbl = _mapMode==='prok'?'Prokopack adults':'Larvae count';
+    [['#1B5E20',`Low ${lbl}`],['#FBCA4A',`Medium ${lbl}`],
+     ['#E8563A',`High ${lbl}`],['#3498DB','Zero / no data']].forEach(([c,l])=>{
+      legend.innerHTML+=`<div class="map-legend-item"><div class="map-dot" style="background:${c}"></div>${l}</div>`;
+    });
+  } else {
+    Object.entries(VILLAGE_COLORS_MAP).filter(([k])=>!k.endsWith('_v')&&!k.endsWith('_V')).forEach(([v,c])=>{
+      legend.innerHTML+=`<div class="map-legend-item"><div class="map-dot" style="background:${c}"></div>${v}</div>`;
+    });
+  }
+
+  // GPS table
+  const tbody = document.getElementById('mapTableBody');
+  if(tbody){
+    tbody.innerHTML='';
+    const f2map2={}, f3map2={};
+    F2_DATA.forEach(r=>{ f2map2[r.hh_id+'_'+r.village]=r; });
+    F3_DATA.forEach(r=>{ const k=r.hh_id+'_'+r.village; if(!f3map2[k]||r.lab_date>f3map2[k].lab_date) f3map2[k]=r; });
+    F1_DATA.forEach(hh=>{
+      const k=hh.hh_id+'_'+hh.village;
+      const f2=f2map2[k]||{}; const f3=f3map2[k]||{};
+      const ci=parseFloat(f2.container_index)||0;
+      const badge=ci>=20?'badge-high':ci>=5?'badge-mid':'badge-low';
+      tbody.insertAdjacentHTML('beforeend',`<tr>
+        <td>${hh.hh_id}</td>
+        <td>${hh.village.replace('_v','').replace('_V','')}</td>
+        <td>${hh.commune}</td>
+        <td>${hh.hh_code||'—'}</td>
+        <td>${hh.lat?hh.lat.toFixed(5):'—'}</td>
+        <td>${hh.lon?hh.lon.toFixed(5):'—'}</td>
+        <td>${ci>0?`<span class="badge ${badge}">${ci.toFixed(1)}%</span>`:'—'}</td>
+        <td>${f3.prok_adults_total||0}</td>
+        <td>${f3.larv_total||0}</td>
+      </tr>`);
+    });
+  }
+
+  // Invalidate map size after tab show
+  setTimeout(()=>_map&&_map.invalidateSize(),100);
+}
+
+
+// ══════════════════════════════════════════════════════════════════════════
+// HH TABLE
+// ══════════════════════════════════════════════════════════════════════════
+function renderHHCards() {
+  const search = (document.getElementById('hhSearch').value||'').toLowerCase();
+  const sortBy = document.getElementById('hhSort').value;
+
+  const f2map = {};
+  F2_DATA.forEach(r => {
+    const k = r.hh_id+'_'+r.village;
+    if (!f2map[k] || r.install_date > f2map[k].install_date) f2map[k] = r;
+  });
+  const f3map = {};
+  F3_DATA.forEach(r => {
+    const k = r.hh_id+'_'+r.village;
+    if (!f3map[k] || r.lab_date > f3map[k].lab_date) f3map[k] = r;
+  });
+
+  const c = document.getElementById('fCommune').value;
+  const v = document.getElementById('fVillage').value;
+  let rows = F1_DATA.filter(hh =>
+    (!c || hh.commune === c) &&
+    (!v || hh.village === v || hh.village === v+'_v' || hh.village.replace('_v','') === v) &&
+    (!search || hh.hh_id.toLowerCase().includes(search) ||
+      hh.village.toLowerCase().includes(search) ||
+      (hh.hh_code||'').toLowerCase().includes(search))
+  );
+
+  rows.sort((a,b) => {
+    const ka=a.hh_id+'_'+a.village, kb=b.hh_id+'_'+b.village;
+    const f2a=f2map[ka]||{}, f2b=f2map[kb]||{};
+    const f3a=f3map[ka]||{}, f3b=f3map[kb]||{};
+    if(sortBy==='village')   return (a.village+a.hh_id).localeCompare(b.village+b.hh_id);
+    if(sortBy==='ci_desc')   return (f2b.container_index||0)-(f2a.container_index||0);
+    if(sortBy==='prok_desc') return (f3b.prok_adults_total||0)-(f3a.prok_adults_total||0);
+    if(sortBy==='larv_desc') return (f3b.larv_total||0)-(f3a.larv_total||0);
+    return (a.hh_id+a.village).localeCompare(b.hh_id+b.village);
+  });
+
+  document.getElementById('hhCount').textContent = rows.length + ' households';
+  const tbody = document.getElementById('hhTableBody');
+  tbody.innerHTML = '';
+
+  rows.forEach(hh => {
+    const k  = hh.hh_id+'_'+hh.village;
+    const f2 = f2map[k]||{}, f3 = f3map[k]||{};
+    const ci = parseFloat(f2.container_index)||0;
+    const ciBadge = ci>=20?'badge-high':ci>=5?'badge-mid':ci>0?'badge-low':'';
+    const vilClean = hh.village.replace('_v','').replace('_V','');
+    const gpsLink = hh.lat
+      ? `<a href="https://maps.google.com/?q=${hh.lat},${hh.lon}" target="_blank"
+           style="color:var(--sky);font-size:11px;text-decoration:none">
+           ${hh.lat.toFixed(4)},${hh.lon.toFixed(4)} ↗</a>`
+      : '—';
+
+    tbody.insertAdjacentHTML('beforeend', `<tr>
+      <td><strong>${hh.hh_id}</strong></td>
+      <td>${vilClean}</td>
+      <td>${hh.commune}</td>
+      <td style="font-family:monospace">${hh.hh_code||'—'}</td>
+      <td>${f2.install_date||'—'}</td>
+      <td>${f3.lab_date||'—'}</td>
+      <td>${ci>0?`<span class="badge ${ciBadge}">${ci.toFixed(1)}%</span>`:'—'}</td>
+      <td>${f2.total_containers||0}</td>
+      <td>${f2.total_positive||0}</td>
+      <td>${f3.ovi_eggs_total||0}</td>
+      <td>${f3.bg_adults_total||0}</td>
+      <td>${f3.prok_adults_total||0}</td>
+      <td>${f3.prok_adults_total>0?(f3.prok_aeg_pct||0).toFixed(1)+'%':'—'}</td>
+      <td>${f3.larv_total||0}</td>
+      <td>${f3.larv_total>0?(f3.larv_aeg_pct||0).toFixed(1)+'%':'—'}</td>
+      <td>${gpsLink}</td>
+    </tr>`);
+  });
+  if(!rows.length) tbody.innerHTML='<tr><td colspan="16" style="text-align:center;padding:30px;color:var(--grey)">No households found</td></tr>';
+}
+
+
+// ── CSV Download ─────────────────────────────────────────────────────────
+function downloadCSV(type) {
+  let data, filename;
+  const now = new Date().toISOString().split('T')[0];
+
+  if (type === 'f3') {
+    data = filteredF3; filename = `CHAI_Form3_Lab_${now}.csv`;
+  } else if (type === 'f2') {
+    data = filteredF2; filename = `CHAI_Form2_Installation_${now}.csv`;
+  } else if (type === 'f1') {
+    data = F1_DATA; filename = `CHAI_Form1_HH_Register_${now}.csv`;
+  } else {
+    // Combined — merge F3 with F2 CI data
+    const f2map = {};
+    filteredF2.forEach(r => { f2map[r.hh_id+'_'+r.village] = r; });
+    data = filteredF3.map(r => {
+      const f2 = f2map[r.hh_id+'_'+r.village] || {};
+      return {
+        ...r,
+        install_date:      f2.install_date||'',
+        total_containers:  f2.total_containers||0,
+        total_positive:    f2.total_positive||0,
+        container_index:   f2.container_index||0,
+        num_large:         f2.num_large||0,
+        pos_large:         f2.pos_large||0,
+        num_small:         f2.num_small||0,
+        pos_small:         f2.pos_small||0,
+        num_discards:      f2.num_discards||0,
+        pos_discards:      f2.pos_discards||0,
+      };
+    });
+    filename = `CHAI_AllForms_${now}.csv`;
+  }
+
+  if (!data || data.length === 0) {
+    alert('No data to download with current filters');
+    return;
+  }
+
+  // Build CSV
+  const headers = Object.keys(data[0]);
+  const rows = [headers.join(',')];
+  data.forEach(r => {
+    rows.push(headers.map(h => {
+      const v = r[h] === null || r[h] === undefined ? '' : String(r[h]);
+      return v.includes(',') || v.includes('"') || v.includes('\n')
+        ? `"${v.replace(/"/g,'""')}"` : v;
+    }).join(','));
+  });
+
+  const blob = new Blob([rows.join('\n')], { type: 'text/csv;charset=utf-8;' });
+  const url  = URL.createObjectURL(blob);
+  const a    = document.createElement('a');
+  a.href = url; a.download = filename;
+  document.body.appendChild(a); a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+
+// ── Render All ─────────────────────────────────────────────────────────────
+function renderAll() {
+  renderKPIs();
+  renderOverviewCharts();
+  renderLarvalCharts();
+  renderProkCharts();
+  renderBGCharts();
+  renderOviCharts();
+  renderContainerCharts();
+  renderHHCards();
+  renderTable();
+}
+
+// ── INIT ───────────────────────────────────────────────────────────────────
+document.addEventListener('DOMContentLoaded', ()=>{
+  // Override with full data
+  filteredF3 = F3_DATA;
+  filteredF2 = F2_DATA;
+  populateFilters();
+  document.getElementById('recCount').textContent = `${F3_DATA.length} records`;
+  document.getElementById('lastUpdated').textContent = 'Data: 2026-07-07';
+  renderAll();
+});
+</script>
+</body>
+</html>
