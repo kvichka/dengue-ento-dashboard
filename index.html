@@ -140,6 +140,36 @@ footer{text-align:center;font-size:11px;color:var(--grey);padding:16px;margin-to
 .map-ctrl-btn.active { background:var(--blue); color:#fff; border-color:var(--blue); }
 .map-ctrl-btn:hover:not(.active) { background:var(--off); }
 
+.timelapse-box { background:var(--card); border:1px solid #eef1f4; border-radius:10px;
+  padding:12px 16px 6px; margin-bottom:10px; }
+.timelapse-top { display:flex; align-items:center; justify-content:space-between;
+  flex-wrap:wrap; gap:8px; margin-bottom:8px; }
+.timelapse-label { font-size:12px; font-weight:600; color:var(--blue); }
+.timelapse-label strong { color:#1A2332; }
+.timelapse-btns { display:flex; gap:6px; flex-wrap:wrap; }
+.tl-btn { padding:4px 10px; border:1px solid #ddd; border-radius:14px; background:#fff;
+  cursor:pointer; font-size:11px; font-weight:600; color:var(--grey); transition:.15s; }
+.tl-btn:hover { background:var(--off); }
+.tl-btn:disabled { opacity:.35; cursor:not-allowed; }
+.tl-btn.tl-play { background:var(--teal); color:#fff; border-color:var(--teal); min-width:64px; }
+.tl-btn.tl-play:hover { background:#0c7d70; }
+.tl-btn.tl-play.playing { background:var(--red, #E8563A); border-color:var(--red, #E8563A); }
+.tl-btn.tl-reset { color:var(--blue); border-color:var(--blue); }
+.timelapse-slider { -webkit-appearance:none; appearance:none; width:100%; height:6px;
+  border-radius:4px; background:linear-gradient(to right, var(--teal) 0%, var(--teal) 0%, #e2e8f0 0%, #e2e8f0 100%);
+  outline:none; cursor:pointer; margin:4px 0; }
+.timelapse-slider:disabled { opacity:.4; cursor:not-allowed; }
+.timelapse-slider::-webkit-slider-thumb { -webkit-appearance:none; appearance:none;
+  width:18px; height:18px; border-radius:50%; background:var(--blue); border:3px solid #fff;
+  box-shadow:0 1px 4px rgba(0,0,0,.35); cursor:pointer; }
+.timelapse-slider::-moz-range-thumb { width:18px; height:18px; border-radius:50%;
+  background:var(--blue); border:3px solid #fff; box-shadow:0 1px 4px rgba(0,0,0,.35); cursor:pointer; }
+.timelapse-ticks { display:flex; justify-content:space-between; font-size:10px;
+  color:var(--grey); padding:0 2px; user-select:none; }
+.timelapse-ticks span { cursor:pointer; padding:2px 4px; border-radius:4px; }
+.timelapse-ticks span:hover { background:var(--off); color:var(--blue); }
+.timelapse-ticks span.active { color:#fff; background:var(--blue); font-weight:700; }
+
 
 @media(max-width:900px){
   .chart-grid{grid-template-columns:1fr}
@@ -521,6 +551,25 @@ footer{text-align:center;font-size:11px;color:var(--grey);padding:16px;margin-to
       <button class="map-ctrl-btn" onclick="setMapMode('hh')">🏠 All Households</button>
       <button class="map-ctrl-btn" id="boundaryToggleBtn" onclick="toggleCommuneBoundaries()" style="margin-left:auto">🗺️ Commune Boundaries: Off</button>
     </div>
+
+    <!-- ═══ TIMELAPSE BAR — scrub / play through report months ═══ -->
+    <div class="timelapse-box">
+      <div class="timelapse-top">
+        <span class="timelapse-label">📅 Report Month: <strong id="timelapseMonthLabel">All Months</strong></span>
+        <div class="timelapse-btns">
+          <button class="tl-btn" id="tlFirstBtn" onclick="timelapseJumpFirst()" title="Jump to first month">⏮</button>
+          <button class="tl-btn" id="tlPrevBtn" onclick="timelapseStep(-1)" title="Previous month">◀</button>
+          <button class="tl-btn tl-play" id="tlPlayBtn" onclick="timelapseTogglePlay()" title="Play through months">▶ Play</button>
+          <button class="tl-btn" id="tlNextBtn" onclick="timelapseStep(1)" title="Next month">▶</button>
+          <button class="tl-btn" id="tlLastBtn" onclick="timelapseJumpLast()" title="Jump to latest month">⏭</button>
+          <button class="tl-btn tl-reset" onclick="timelapseReset()" title="Show all months combined">↺ All Months</button>
+        </div>
+      </div>
+      <input type="range" id="timelapseSlider" class="timelapse-slider" min="0" max="0" step="1" value="0"
+        oninput="onTimelapseSliderInput(this.value)" disabled>
+      <div id="timelapseTicks" class="timelapse-ticks"></div>
+    </div>
+
     <div id="communeLegend" style="display:none;gap:14px;flex-wrap:wrap;margin-bottom:10px;font-size:11px"></div>
     <div id="map"></div>
     <div class="map-info" id="mapLegendBox">
@@ -781,6 +830,7 @@ function populateFilters() {
   ALL_VILLAGES.forEach(v => fV.add(new Option(v,v)));
   years.forEach(y => fY.add(new Option(y,y)));
   buildMonthPanel(months);
+  initTimelapse(months);
 
   // Comparison tab period dropdowns — default to the two most recent periods
   const cmpCurrent = document.getElementById('cmpCurrent');
@@ -833,6 +883,7 @@ document.addEventListener('click', (e) => {
 });
 
 function onMonthCheckChange() {
+  stopTimelapsePlay();
   const checked = [...document.querySelectorAll('#monthPanel input[type=checkbox]:checked')].map(cb => cb.value);
   selectedMonths = checked;
   updateMonthButtonLabel();
@@ -840,6 +891,7 @@ function onMonthCheckChange() {
 }
 
 function selectAllMonths(months) {
+  stopTimelapsePlay();
   document.querySelectorAll('#monthPanel input[type=checkbox]').forEach(cb => cb.checked = true);
   selectedMonths = [...months];
   updateMonthButtonLabel();
@@ -847,6 +899,7 @@ function selectAllMonths(months) {
 }
 
 function clearMonths() {
+  stopTimelapsePlay();
   document.querySelectorAll('#monthPanel input[type=checkbox]').forEach(cb => cb.checked = false);
   selectedMonths = [];
   updateMonthButtonLabel();
@@ -913,6 +966,7 @@ function applyFilters() {
   );
   document.getElementById('recCount').textContent = `${filteredF3.length} records`;
   renderAll();
+  updateTimelapseUI();
 }
 
 function resetFilters() {
@@ -922,6 +976,137 @@ function resetFilters() {
   fV.innerHTML = '<option value="">All Villages</option>';
   ALL_VILLAGES.forEach(v => fV.add(new Option(v,v)));
   clearMonths();
+}
+
+// ── Timelapse bar (Map tab) ──────────────────────────────────────────────────
+// Scrubs the shared month filter one report period at a time so the map
+// (and every other tab, since they share the same filtered data) animates
+// from month to month. Deliberately reuses the existing selectedMonths /
+// applyFilters() pipeline rather than a separate one, so the map, KPIs, and
+// checkboxes up top can never fall out of sync with each other.
+let TIMELAPSE_MONTHS = [];
+let timelapseTimer = null;
+
+function monthLabel(m) {
+  if (!m) return m;
+  const [y, mo] = m.split('-');
+  const names = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  const idx = parseInt(mo,10) - 1;
+  return (names[idx] || mo) + ' ' + y;
+}
+
+function initTimelapse(months) {
+  TIMELAPSE_MONTHS = months;
+  const slider = document.getElementById('timelapseSlider');
+  if (!slider) return;
+  slider.max = Math.max(0, months.length - 1);
+  slider.disabled = months.length === 0;
+  renderTimelapseTicks();
+  updateTimelapseUI();
+}
+
+function renderTimelapseTicks() {
+  const box = document.getElementById('timelapseTicks');
+  if (!box) return;
+  box.innerHTML = TIMELAPSE_MONTHS.map((m,i) =>
+    `<span onclick="timelapseTickClick(${i})">${monthLabel(m)}</span>`
+  ).join('');
+}
+
+function currentTimelapseIndex() {
+  if (selectedMonths.length !== 1) return -1;
+  return TIMELAPSE_MONTHS.indexOf(selectedMonths[0]);
+}
+
+function setTimelapseMonth(idx) {
+  if (!TIMELAPSE_MONTHS.length) return;
+  idx = Math.max(0, Math.min(TIMELAPSE_MONTHS.length - 1, idx));
+  selectedMonths = [TIMELAPSE_MONTHS[idx]];
+  // Keep the existing top-of-page month checkboxes in sync so both controls
+  // always agree on what's currently filtered
+  document.querySelectorAll('#monthPanel input[type=checkbox]').forEach(cb => {
+    cb.checked = (cb.value === TIMELAPSE_MONTHS[idx]);
+  });
+  updateMonthButtonLabel();
+  applyFilters();
+}
+
+function timelapseTickClick(idx) {
+  stopTimelapsePlay();
+  setTimelapseMonth(idx);
+}
+
+function timelapseStep(delta) {
+  stopTimelapsePlay();
+  const cur = currentTimelapseIndex();
+  const base = cur === -1 ? (delta > 0 ? -1 : TIMELAPSE_MONTHS.length) : cur;
+  setTimelapseMonth(base + delta);
+}
+
+function timelapseJumpFirst() { stopTimelapsePlay(); setTimelapseMonth(0); }
+function timelapseJumpLast()  { stopTimelapsePlay(); setTimelapseMonth(TIMELAPSE_MONTHS.length - 1); }
+
+function timelapseReset() {
+  stopTimelapsePlay();
+  clearMonths(); // resets selectedMonths=[], syncs checkboxes, re-filters to "All Months"
+}
+
+function timelapseTogglePlay() {
+  if (timelapseTimer) { stopTimelapsePlay(); return; }
+  const btn = document.getElementById('tlPlayBtn');
+  btn.textContent = '⏸ Pause';
+  btn.classList.add('playing');
+  let cur = currentTimelapseIndex();
+  if (cur === -1 || cur >= TIMELAPSE_MONTHS.length - 1) cur = -1; // restart from beginning
+  setTimelapseMonth(cur + 1);
+  timelapseTimer = setInterval(() => {
+    const c = currentTimelapseIndex();
+    if (c >= TIMELAPSE_MONTHS.length - 1) { stopTimelapsePlay(); return; }
+    setTimelapseMonth(c + 1);
+  }, 1400);
+}
+
+function stopTimelapsePlay() {
+  if (timelapseTimer) { clearInterval(timelapseTimer); timelapseTimer = null; }
+  const btn = document.getElementById('tlPlayBtn');
+  if (btn) { btn.textContent = '▶ Play'; btn.classList.remove('playing'); }
+}
+
+function onTimelapseSliderInput(val) {
+  stopTimelapsePlay();
+  setTimelapseMonth(parseInt(val, 10));
+}
+
+function updateTimelapseUI() {
+  const slider = document.getElementById('timelapseSlider');
+  const label = document.getElementById('timelapseMonthLabel');
+  if (!slider || !label || !TIMELAPSE_MONTHS.length) return;
+  const idx = currentTimelapseIndex();
+
+  label.textContent = idx === -1
+    ? (selectedMonths.length > 1 ? `${selectedMonths.length} months selected` : 'All Months')
+    : monthLabel(TIMELAPSE_MONTHS[idx]);
+
+  if (idx !== -1) slider.value = idx;
+
+  document.querySelectorAll('#timelapseTicks span').forEach((el, i) => {
+    el.classList.toggle('active', i === idx);
+  });
+
+  const firstBtn = document.getElementById('tlFirstBtn'), prevBtn = document.getElementById('tlPrevBtn');
+  const nextBtn  = document.getElementById('tlNextBtn'),  lastBtn = document.getElementById('tlLastBtn');
+  if (firstBtn) firstBtn.disabled = idx === 0;
+  if (prevBtn)  prevBtn.disabled  = idx === 0;
+  if (nextBtn)  nextBtn.disabled  = idx === TIMELAPSE_MONTHS.length - 1;
+  if (lastBtn)  lastBtn.disabled  = idx === TIMELAPSE_MONTHS.length - 1;
+
+  // Fill the slider track up to the current position
+  if (TIMELAPSE_MONTHS.length > 1 && idx >= 0) {
+    const pct = (idx / (TIMELAPSE_MONTHS.length - 1)) * 100;
+    slider.style.background = `linear-gradient(to right, var(--teal) 0%, var(--teal) ${pct}%, #e2e8f0 ${pct}%, #e2e8f0 100%)`;
+  } else {
+    slider.style.background = '#e2e8f0';
+  }
 }
 
 // ── KPIs ───────────────────────────────────────────────────────────────────
@@ -1665,6 +1850,51 @@ function renderContainerCharts() {
 // ══════════════════════════════════════════════════════════════════════════
 let _map=null, _mapMode='ci', _markers=[];
 
+// Some rounds only collect ONE method (e.g. an ovitrap-only monitoring visit).
+// Collapsing F3 to "the single record with the latest lab_date" per household
+// means that if the latest round only did ovitrap eggs, Prokopack/Larvae/BG
+// show as zero even though real counts exist from an earlier round. This
+// merges each indicator group independently, taking each one's own most
+// recent round where it has a non-zero total, so a data-sparse latest round
+// doesn't blank out other methods' real numbers.
+const PROK_FIELDS = ['prok_aeg_female','prok_aeg_male','prok_alb_female','prok_alb_male','prok_culex','prok_aeg_total','prok_alb_total','prok_adults_total','prok_aeg_pct','prok_alb_pct'];
+const LARV_FIELDS = ['larv_aeg','larv_alb','larv_culex','larv_total','larv_aeg_pct'];
+const BG_FIELDS   = ['bg_aeg_f_in','bg_aeg_m_in','bg_alb_f_in','bg_alb_m_in','bg_culex_in','bg_aeg_f_out','bg_aeg_m_out','bg_alb_f_out','bg_alb_m_out','bg_culex_out','bg_aeg_total','bg_alb_total','bg_culex_total','bg_adults_total','bg_aeg_pct'];
+const OVI_FIELDS  = ['ovi_eggs_indoor','ovi_eggs_outdoor','ovi_eggs_total'];
+
+function mergeF3Records(records){
+  const sorted = [...records].sort((a,b)=> (a.lab_date||'').localeCompare(b.lab_date||''));
+  const latest = sorted[sorted.length-1];
+  const result = {...latest}; // lab_date/month/year/hh_id etc. come from the true latest round
+
+  function pickLatestNonZero(fields, totalField){
+    for (let i=sorted.length-1; i>=0; i--){
+      if ((sorted[i][totalField]||0) > 0){
+        fields.forEach(f=>{ result[f]=sorted[i][f]; });
+        return;
+      }
+    }
+    // No round ever had a non-zero total for this indicator — leave the
+    // latest round's (zero) values, since that's genuinely "no data"/"zero catch"
+  }
+  pickLatestNonZero(PROK_FIELDS,'prok_adults_total');
+  pickLatestNonZero(LARV_FIELDS,'larv_total');
+  pickLatestNonZero(BG_FIELDS,'bg_adults_total');
+  pickLatestNonZero(OVI_FIELDS,'ovi_eggs_total');
+  return result;
+}
+
+function buildF3Map(rows){
+  const grouped = {};
+  rows.forEach(r=>{
+    const key = r.hh_id+'_'+r.village;
+    (grouped[key] = grouped[key] || []).push(r);
+  });
+  const map = {};
+  Object.keys(grouped).forEach(key=>{ map[key] = mergeF3Records(grouped[key]); });
+  return map;
+}
+
 // Official commune boundaries — Battambang City (Svay Por district). Source:
 // Cambodia government administrative boundaries (khm_admbnda_adm3_gov layer,
 // PRO_CODE 2 / DIS_CODE 203), reprojected from EPSG:3148 to WGS84. Updated
@@ -1793,11 +2023,7 @@ function renderMapMarkers(){
   // Use filtered data for map markers
   const f2map={};
   filteredF2.forEach(r=>{ f2map[r.hh_id+'_'+r.village]=r; });
-  const f3map={};
-  filteredF3.forEach(r=>{
-    const key=r.hh_id+'_'+r.village;
-    if(!f3map[key]||r.lab_date>f3map[key].lab_date) f3map[key]=r;
-  });
+  const f3map = buildF3Map(filteredF3);
 
   // Max values for scaling (based on the current filtered view, so color
   // intensity stays meaningful when a filter narrows the data down)
@@ -1918,13 +2144,13 @@ function renderMapMarkers(){
   const legend = document.getElementById('mapLegend');
   legend.innerHTML='';
   if(_mapMode==='ci'){
-    [['#1B5E20','CI < 5% (Low)'],['#FBCA4A','CI 5–20% (Moderate)'],
+    [['#6DCBBE','CI < 5% (Low)'],['#FBCA4A','CI 5–20% (Moderate)'],
      ['#E8563A','CI ≥ 20% (High — WHO threshold)'],['#3498DB','No data']].forEach(([c,l])=>{
       legend.innerHTML+=`<div class="map-legend-item"><div class="map-dot" style="background:${c}"></div>${l}</div>`;
     });
   } else if(_mapMode==='prok'||_mapMode==='larv'||_mapMode==='ovi'){
     const lbl = _mapMode==='prok'?'Prokopack adults':_mapMode==='larv'?'Larvae count':'Ovitrap eggs';
-    [['#1B5E20',`Low ${lbl}`],['#FBCA4A',`Medium ${lbl}`],
+    [['#6DCBBE',`Low ${lbl}`],['#FBCA4A',`Medium ${lbl}`],
      ['#E8563A',`High ${lbl}`],['#3498DB','Zero / no data']].forEach(([c,l])=>{
       legend.innerHTML+=`<div class="map-legend-item"><div class="map-dot" style="background:${c}"></div>${l}</div>`;
     });
@@ -1938,9 +2164,8 @@ function renderMapMarkers(){
   const tbody = document.getElementById('mapTableBody');
   if(tbody){
     tbody.innerHTML='';
-    const f2map2={}, f3map2={};
+    const f2map2={}; const f3map2 = buildF3Map(filteredF3);
     filteredF2.forEach(r=>{ f2map2[r.hh_id+'_'+r.village]=r; });
-    filteredF3.forEach(r=>{ const k=r.hh_id+'_'+r.village; if(!f3map2[k]||r.lab_date>f3map2[k].lab_date) f3map2[k]=r; });
     let gpsRows = [...filteredF1];
     if (gpsSortCol >= 0) {
       gpsRows.sort((a,b)=>{
