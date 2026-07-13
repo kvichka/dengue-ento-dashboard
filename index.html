@@ -604,6 +604,7 @@ footer{text-align:center;font-size:12px;color:var(--grey);padding:16px;margin-to
       <button class="map-ctrl-btn" onclick="setMapMode('prok')" data-i18n="btn_map_prok">🦟 Prokopack Adults</button>
       <button class="map-ctrl-btn" onclick="setMapMode('larv')" data-i18n="btn_map_larv">🔬 Larvae Total</button>
       <button class="map-ctrl-btn" onclick="setMapMode('ovi')" data-i18n="btn_map_ovi">🥚 Ovitrap Eggs</button>
+      <button class="map-ctrl-btn" onclick="setMapMode('aegpct')" data-i18n="btn_map_aegpct">🦟 Ae. aegypti Risk %</button>
       <button class="map-ctrl-btn" onclick="setMapMode('hh')" data-i18n="btn_map_hh">🏠 All Households</button>
       <button class="map-ctrl-btn" id="boundaryToggleBtn" onclick="toggleCommuneBoundaries()" style="margin-left:auto" data-i18n="btn_commune_boundaries">🗺️ Commune Boundaries: Off</button>
     </div>
@@ -896,6 +897,8 @@ const I18N = {
   btn_map_prok: { en: '🦟 Prokopack Adults', km: '🦟 សត្វមូស Prokopack ពេញវ័យ' },
   btn_map_larv: { en: '🔬 Larvae Total', km: '🔬 ដង្កូវទឹកសរុប' },
   btn_map_ovi: { en: '🥚 Ovitrap Eggs', km: '🥚 ពងមូស Ovitrap' },
+  btn_map_aegpct: { en: '🦟 Ae. aegypti Risk %', km: '🦟 ភាគរយហានិភ័យ Ae. aegypti' },
+  legend_aegpct: { en: 'Ae. aegypti % of mosquitoes', km: 'ភាគរយ Ae. aegypti ក្នុងចំណោមសត្វមូស' },
   btn_map_hh: { en: '🏠 All Households', km: '🏠 គ្រួសារទាំងអស់' },
   btn_commune_boundaries: { en: '🗺️ Commune Boundaries: Off', km: '🗺️ ព្រំដែនឃុំ៖ បិទ' },
   btn_commune_boundaries_on: { en: '🗺️ Commune Boundaries: On', km: '🗺️ ព្រំដែនឃុំ៖ បើក' },
@@ -3037,6 +3040,18 @@ function renderMapMarkers(){
       color=valueColor(ovi,maxOvi); radius=ovi>0?7+ovi/maxOvi*10:6;
       tooltipVal=`Ovitrap eggs: ${ovi}`;
       legendKey='value';
+    } else if(_mapMode==='aegpct'){
+      // Ae. aegypti is the primary dengue vector, so its share of all
+      // mosquitoes caught (Prokopack + BG combined) is a direct risk signal —
+      // a household could have low mosquito counts overall but still be
+      // high-risk if nearly all of them are Ae. aegypti.
+      const aegTotal = (f3.prok_aeg_total||0) + (f3.bg_aeg_total||0);
+      const allTotal = (f3.prok_adults_total||0) + (f3.bg_adults_total||0);
+      const aegPct = allTotal>0 ? (aegTotal/allTotal*100) : 0;
+      color = allTotal>0 ? valueColor(aegPct,100) : '#64809C';
+      radius = allTotal>0 ? 7+aegPct/100*10 : 6;
+      tooltipVal = allTotal>0 ? `Ae. aegypti: ${aegPct.toFixed(0)}% of mosquitoes` : 'No mosquitoes caught';
+      legendKey='aegpct';
     } else {
       color=VILLAGE_COLORS_MAP[hh.village]||'#9DDBD5'; radius=8;
       tooltipVal=vilLabel;
@@ -3126,8 +3141,19 @@ function renderMapMarkers(){
     });
   } else if(_mapMode==='prok'||_mapMode==='larv'||_mapMode==='ovi'){
     const lbl = _mapMode==='prok'?t('legend_prok'):_mapMode==='larv'?t('legend_larv'):t('legend_ovi');
-    [['#159895',`${t('word_low')} ${lbl}`],['#F8BE3D',`${t('word_medium')} ${lbl}`],
-     ['#F4837A',`${t('word_high')} ${lbl}`],['#64809C',t('legend_zero_no_data')]].forEach(([c,l])=>{
+    const maxV = _mapMode==='prok'?maxProk:_mapMode==='larv'?maxLarv:maxOvi;
+    const lowMax = Math.floor(maxV*0.33), midMax = Math.floor(maxV*0.66);
+    [['#159895',`${t('word_low')} ${lbl} (1–${lowMax})`],
+     ['#F8BE3D',`${t('word_medium')} ${lbl} (${lowMax+1}–${midMax})`],
+     ['#F4837A',`${t('word_high')} ${lbl} (${midMax+1}–${nf(maxV)})`],
+     ['#64809C',t('legend_zero_no_data')]].forEach(([c,l])=>{
+      legend.innerHTML+=`<div class="map-legend-item"><div class="map-dot" style="background:${c}"></div>${l}</div>`;
+    });
+  } else if(_mapMode==='aegpct'){
+    [['#159895',`${t('word_low')} (1–32%)`],
+     ['#F8BE3D',`${t('word_medium')} (33–65%)`],
+     ['#F4837A',`${t('word_high')} (≥66%)`],
+     ['#64809C',t('legend_zero_no_data')]].forEach(([c,l])=>{
       legend.innerHTML+=`<div class="map-legend-item"><div class="map-dot" style="background:${c}"></div>${l}</div>`;
     });
   } else {
@@ -3289,4 +3315,3 @@ document.addEventListener('DOMContentLoaded', ()=>{
 </script>
 </body>
 </html>
-
