@@ -1,4 +1,3 @@
-
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -110,6 +109,9 @@ body.lang-km textarea { font-family:'Battambang','Segoe UI',Arial,sans-serif; }
 .chart-dl-btn{background:none;border:1px solid #e2e8f0;border-radius:6px;cursor:pointer;
   font-size:13px;padding:3px 6px;line-height:1;color:var(--grey);transition:.15s}
 .chart-dl-btn:hover{background:var(--off);border-color:var(--teal);color:var(--teal)}
+.chart-note{margin-top:10px;padding:8px 12px;background:#FFFBEB;border-left:3px solid var(--amber);
+  border-radius:6px;font-size:11.5px;line-height:1.5;color:#5C4408;display:flex;gap:6px;align-items:flex-start}
+.chart-note-icon{flex-shrink:0;font-size:12px}
 
 /* TABS */
 .tabs{display:flex;gap:6px;margin-bottom:var(--gap);flex-wrap:wrap}
@@ -808,8 +810,8 @@ try { Chart.defaults.font.family = "'Segoe UI', Arial, sans-serif"; } catch(e) {
 // Worth a native-speaker/entomology-team review before wide distribution.
 let currentLang = 'en';
 const I18N = {
-  hdr_title: { en: '🦟 Battambang — Entomological Surveillance Dashboard', km: '🦟 ផ្ទាំងគ្រប់គ្រងទិន្នន័យអង្កេតបាណកសាស្រ្ត — ខេត្ត បាត់ដំបង' },
-  hdr_subtitle: { en: 'Wolbachia Dengue Program · Battambang, Cambodia · v2026.07', km: 'កម្មវិធី Wolbachia ប្រឆាំងជំងឺគ្រុនឈាម · ខេត្តបាត់ដំបង, ប្រទេសកម្ពុជា · v2026.07' },
+  hdr_title: { en: '🦟 Battambang — Entomological Surveillance Dashboard', km: '🦟 ផ្ទាំងគ្រប់គ្រងទិន្នន័យអង្កេតបំណកសាស្រ្ត — ខេត្ត បាត់ដំបង' },
+  hdr_subtitle: { en: 'Wolbachia Dengue Program · Battambang, Cambodia · v2026.07', km: 'កម្មវិធី Wolbachia ប្រឆាំងជំងឺគ្រុនឈាម · ខេត្ត បាត់ដំបង, ប្រទេសកម្ពុជា · v2026.07' },
   filter_commune: { en: 'Commune', km: 'ឃុំ' },
   filter_village: { en: 'Village', km: 'ភូមិ' },
   filter_month: { en: 'Month', km: 'ខែ' },
@@ -1168,6 +1170,29 @@ function chartTitleFor(chartId) {
   return (currentLang === 'km' ? CHART_TITLES_KM[chartId] : CHART_TITLES[chartId]) || CHART_TITLES[chartId] || '';
 }
 
+// Sets (or lazily creates) the "key takeaway" note shown directly under a
+// chart's <canvas>, and read back by downloadChartImage() so the exported
+// PNG always reflects whatever the note currently says — i.e. computed live
+// from the current filters, not a fixed sentence. English only for now — not
+// yet translated to Khmer since these are new free-text sentences that
+// haven't been checked against the Chuon Nath standard.
+function setNote(chartId, text) {
+  const canvas = document.getElementById(chartId);
+  if (!canvas) return;
+  let el = document.getElementById('note-' + chartId);
+  if (!el) {
+    el = document.createElement('div');
+    el.className = 'chart-note';
+    el.id = 'note-' + chartId;
+    canvas.insertAdjacentElement('afterend', el);
+  }
+  el.textContent = text;
+}
+function chartNoteFor(chartId) {
+  const el = document.getElementById('note-' + chartId);
+  return el ? el.textContent : '';
+}
+
 // Village/commune Khmer names — place names, so kept as a direct lookup
 // rather than the general I18N dict. Village keys include the internal
 // "_v" variants used throughout the dataset (e.g. 'Toul Ta Ek_v').
@@ -1209,6 +1234,33 @@ function downloadChartImage(chartId) {
     const titleH = titleText ? Math.round(38 * scaleY) : 0;
     const isSlice = chart.config.type === 'doughnut' || chart.config.type === 'pie';
 
+    // Wrap the note text to fit the output width, at the same font size that
+    // will be used to draw it, so height and drawing stay in sync.
+    const noteText = chartNoteFor(chartId);
+    const noteFontPx = Math.round(12.5 * scaleY);
+    const notePaddingX = Math.round(16 * scaleX);
+    const notePaddingY = Math.round(10 * scaleY);
+    let noteLines = [];
+    if (noteText) {
+      const measureCtx = document.createElement('canvas').getContext('2d');
+      measureCtx.font = `${noteFontPx}px ${currentLang==='km'?'Battambang, ':''}Segoe UI, Arial, sans-serif`;
+      const maxLineWidth = srcCanvas.width - notePaddingX * 2 - Math.round(22*scaleX);
+      const words = noteText.split(' ');
+      let line = '';
+      words.forEach(w => {
+        const test = line ? line + ' ' + w : w;
+        if (measureCtx.measureText(test).width > maxLineWidth && line) {
+          noteLines.push(line);
+          line = w;
+        } else {
+          line = test;
+        }
+      });
+      if (line) noteLines.push(line);
+    }
+    const noteLineH = Math.round(noteFontPx * 1.5);
+    const noteH = noteLines.length ? noteLines.length * noteLineH + notePaddingY * 2 : 0;
+
     // Gather label text + position BEFORE building the output canvas —
     // pure read-only queries against Chart.js's current element positions.
     const labelPts = [];
@@ -1234,7 +1286,7 @@ function downloadChartImage(chartId) {
 
     const out = document.createElement('canvas');
     out.width = srcCanvas.width;
-    out.height = srcCanvas.height + titleH;
+    out.height = srcCanvas.height + titleH + noteH;
     const ctx = out.getContext('2d');
     ctx.fillStyle = '#ffffff';
     ctx.fillRect(0, 0, out.width, out.height);
@@ -1257,6 +1309,25 @@ function downloadChartImage(chartId) {
       ctx.fillStyle = isSlice ? '#ffffff' : '#1A2332';
       ctx.fillText(p.text, px, isSlice ? py : py - Math.round(12*scaleY));
     });
+
+    if (noteLines.length) {
+      const noteY = titleH + srcCanvas.height;
+      ctx.fillStyle = '#FFFBEB';
+      ctx.fillRect(0, noteY, out.width, noteH);
+      ctx.fillStyle = '#D97706';
+      ctx.fillRect(0, noteY, Math.round(4*scaleX), noteH);
+      ctx.fillStyle = '#5C4408';
+      ctx.font = `${noteFontPx}px ${currentLang==='km'?'Battambang, ':''}Segoe UI, Arial, sans-serif`;
+      ctx.textAlign = 'left';
+      ctx.textBaseline = 'middle';
+      noteLines.forEach((ln, i) => {
+        const ly = noteY + notePaddingY + noteLineH * i + noteLineH/2;
+        ctx.fillText(ln, notePaddingX + Math.round(18*scaleX), ly);
+      });
+      // small flag icon at the start of the note block
+      ctx.font = `${Math.round(noteFontPx*1.1)}px Segoe UI, Arial, sans-serif`;
+      ctx.fillText('\u{1F6A9}', notePaddingX, noteY + notePaddingY + noteLineH/2);
+    }
 
     triggerDownload(out.toDataURL('image/png', 1));
   } catch(e) {
@@ -1772,6 +1843,14 @@ function renderComparisonTab() {
     ]},
     options:{...baseOpts(), scales:{y:{beginAtZero:true,max:100,ticks:{font:{size:10}}},x:{ticks:{font:{size:10}}}}}
   });
+  {
+    const diff = curr.ci - prev.ci;
+    setNote('chartCompareCI', Math.abs(diff) < 0.05
+      ? `➡️ Container Index is essentially unchanged (${curr.ci.toFixed(1)}% vs ${prev.ci.toFixed(1)}%).`
+      : (diff > 0
+        ? `⚠️ Container Index rose from ${prev.ci.toFixed(1)}% to ${curr.ci.toFixed(1)}% — breeding risk is trending worse.`
+        : `✅ Container Index fell from ${prev.ci.toFixed(1)}% to ${curr.ci.toFixed(1)}% — breeding risk is trending better.`));
+  }
 
   makeChart('chartCompareCounts', {type:'bar',
     data:{labels:['Prokopack Adults','Total Larvae','Ovitrap Eggs','Lab Visits'],datasets:[
@@ -1780,6 +1859,18 @@ function renderComparisonTab() {
     ]},
     options:baseOpts()
   });
+  {
+    const metrics = [
+      {label:'Prokopack adults', curr:curr.prok, prev:prev.prok},
+      {label:'total larvae', curr:curr.larv, prev:prev.larv},
+      {label:'ovitrap eggs', curr:curr.ovi, prev:prev.ovi},
+    ];
+    const withGrowth = metrics.map(m => ({...m, growth: m.prev>0 ? (m.curr-m.prev)/m.prev*100 : (m.curr>0?Infinity:0)}));
+    const topRise = withGrowth.reduce((a,b)=> b.growth>a.growth ? b : a, withGrowth[0]);
+    setNote('chartCompareCounts', (topRise && topRise.growth>0 && isFinite(topRise.growth))
+      ? `📈 ${topRise.label} rose the most between periods (${topRise.prev} → ${topRise.curr}, +${topRise.growth.toFixed(0)}%).`
+      : '➡️ No metric increased between the two periods for the current filters.');
+  }
 
   makeChart('chartCompareProkSpecies', {type:'bar',
     data:{labels:['Ae. aegypti','Ae. albopictus','Culex sp.'],datasets:[
@@ -1788,6 +1879,16 @@ function renderComparisonTab() {
     ]},
     options:baseOpts()
   });
+  {
+    const prevTot = prev.prokAeg+prev.prokAlb+prev.prokCulex;
+    const currTot = curr.prokAeg+curr.prokAlb+curr.prokCulex;
+    const prevAegPct = prevTot ? prev.prokAeg/prevTot*100 : 0;
+    const currAegPct = currTot ? curr.prokAeg/currTot*100 : 0;
+    const delta = currAegPct - prevAegPct;
+    setNote('chartCompareProkSpecies', (prevTot||currTot)
+      ? `🦟 Ae. aegypti's share of Prokopack catch went from ${prevAegPct.toFixed(1)}% to ${currAegPct.toFixed(1)}%${Math.abs(delta)>=0.5 ? (delta>0?' — an increasing dengue vector share.':' — a decreasing dengue vector share.') : '.'}`
+      : 'No Prokopack data for either period.');
+  }
 
   makeChart('chartCompareLarvSpecies', {type:'bar',
     data:{labels:['Ae. aegypti','Ae. albopictus','Culex sp.'],datasets:[
@@ -1796,6 +1897,16 @@ function renderComparisonTab() {
     ]},
     options:baseOpts()
   });
+  {
+    const prevTotL = prev.larvAeg+prev.larvAlb+prev.larvCulex;
+    const currTotL = curr.larvAeg+curr.larvAlb+curr.larvCulex;
+    const prevAegPctL = prevTotL ? prev.larvAeg/prevTotL*100 : 0;
+    const currAegPctL = currTotL ? curr.larvAeg/currTotL*100 : 0;
+    const deltaL = currAegPctL - prevAegPctL;
+    setNote('chartCompareLarvSpecies', (prevTotL||currTotL)
+      ? `🔬 Ae. aegypti's share of larvae went from ${prevAegPctL.toFixed(1)}% to ${currAegPctL.toFixed(1)}%${Math.abs(deltaL)>=0.5 ? (deltaL>0?' — often a leading sign of rising adult vector density.':' — a declining share of larvae.') : '.'}`
+      : 'No larval data for either period.');
+  }
 }
 
 function renderKPIs() {
@@ -1946,6 +2057,15 @@ function renderOverviewCharts() {
       borderColor:ciVals.map(v=>v>=20?'#2E86C1':v>=5?'#6FB8E0':'#BFE3F5'),borderWidth:1}]},
     options:{...baseOpts('CI%',true)}
   });
+  {
+    const highCount = ciVals.filter(v=>v>=20).length;
+    const topIdx = ciVals.length ? ciVals.indexOf(Math.max(...ciVals)) : -1;
+    setNote('chartCIVillage', ciVals.length
+      ? (highCount>0
+        ? `⚠️ ${highCount} of ${vils.length} village(s) are at/above the WHO 20% CI threshold. Highest: ${villageLabel(vils[topIdx])} at ${ciVals[topIdx]}%.`
+        : `✅ All ${vils.length} villages are below the WHO 20% CI threshold.`)
+      : 'No container index data for current filters.');
+  }
 
   // Species pie (Prokopack)
   const aeAeg = sum(filteredF3,'prok_aeg_total');
@@ -1965,6 +2085,13 @@ function renderOverviewCharts() {
         }}}
       }}
   });
+  {
+    const totSp = aeAeg+aeAlb+culex;
+    const aegPct = totSp ? (aeAeg/totSp*100).toFixed(1) : 0;
+    setNote('chartSpeciesPie', totSp
+      ? `🦟 Ae. aegypti — the primary dengue vector — makes up ${aegPct}% of Prokopack catch.`
+      : 'No Prokopack data for current filters.');
+  }
 
   // Prokopack by village
   const byVil3 = grpBy(filteredF3,'village');
@@ -1975,6 +2102,13 @@ function renderOverviewCharts() {
       barDS('Culex sp.',vils3.map(v=>sum(byVil3[v],'prok_culex')),'#F8BE3D')]},
     options:{...baseOpts(),scales:{x:{stacked:true,ticks:{font:{size:10}}},y:{stacked:true,beginAtZero:true,ticks:{font:{size:10}}}}}
   });
+  {
+    const prokTotals = vils3.map(v=>sum(byVil3[v],'prok_aeg_total')+sum(byVil3[v],'prok_alb_total')+sum(byVil3[v],'prok_culex'));
+    const topP = prokTotals.length ? prokTotals.indexOf(Math.max(...prokTotals)) : -1;
+    setNote('chartProkVillage', vils3.length
+      ? `📈 ${villageLabel(vils3[topP])} recorded the highest Prokopack catch (${prokTotals[topP]} adults total).`
+      : 'No Prokopack data for current filters.');
+  }
 
   // Larvae by village
   makeChart('chartLarvVillage',{type:'bar',
@@ -1983,6 +2117,13 @@ function renderOverviewCharts() {
       barDS('Culex',vils3.map(v=>sum(byVil3[v],'larv_culex')),'#F8BE3D')]},
     options:{...baseOpts(),scales:{x:{stacked:true,ticks:{font:{size:10}}},y:{stacked:true,beginAtZero:true,ticks:{font:{size:10}}}}}
   });
+  {
+    const larvTotals = vils3.map(v=>sum(byVil3[v],'larv_aeg')+sum(byVil3[v],'larv_alb')+sum(byVil3[v],'larv_culex'));
+    const topL = larvTotals.length ? larvTotals.indexOf(Math.max(...larvTotals)) : -1;
+    setNote('chartLarvVillage', vils3.length
+      ? `🌿 ${villageLabel(vils3[topL])} has the highest larval count (${larvTotals[topL]}) — a leading indicator of upcoming adult density.`
+      : 'No larval data for current filters.');
+  }
 }
 
 // ── LARVAL CHARTS ──────────────────────────────────────────────────────────
@@ -2004,6 +2145,15 @@ function renderLarvalCharts() {
       borderWidth:1}]},
     options:{...baseOpts()}
   });
+  {
+    const highCount = ciVals.filter(v=>v>=20).length;
+    const topIdx = ciVals.length ? ciVals.indexOf(Math.max(...ciVals)) : -1;
+    setNote('chartCI2', ciVals.length
+      ? (highCount>0
+        ? `⚠️ ${highCount} of ${vils2.length} village(s) are at/above the WHO 20% CI threshold. Highest: ${villageLabel(vils2[topIdx])} at ${ciVals[topIdx]}%.`
+        : `✅ All ${vils2.length} villages are below the WHO 20% CI threshold.`)
+      : 'No container index data for current filters.');
+  }
 
   // Larvae species by village (stacked)
   makeChart('chartLarvSpecies',{type:'bar',
@@ -2012,6 +2162,15 @@ function renderLarvalCharts() {
       barDS('Culex',vils3.map(v=>sum(byVil3[v],'larv_culex')),'#F8BE3D','sp')]},
     options:{...baseOpts(),scales:{x:{stacked:true,ticks:{font:{size:10}}},y:{stacked:true,beginAtZero:true,ticks:{font:{size:10}}}}}
   });
+  {
+    const totLaeg=sum(filteredF3,'larv_aeg'), totLalb=sum(filteredF3,'larv_alb'), totLcx=sum(filteredF3,'larv_culex');
+    const totL = totLaeg+totLalb+totLcx;
+    const maxV = Math.max(totLaeg,totLalb,totLcx);
+    const domSpecies = totL ? (maxV===totLaeg?'Ae. aegypti':(maxV===totLalb?'Ae. albopictus':'Culex sp.')) : 'n/a';
+    setNote('chartLarvSpecies', totL
+      ? `🌿 ${domSpecies} dominates larval collections program-wide (${(maxV/totL*100).toFixed(1)}%).`
+      : 'No larvae recorded for current filters.');
+  }
 
   // Containers inspected vs positive
   makeChart('chartContainers',{type:'bar',
@@ -2020,6 +2179,13 @@ function renderLarvalCharts() {
       barDS('Positive', vils2.map(v=>sum(byVil2[v],'total_positive')), '#F4837A')]},
     options:baseOpts()
   });
+  {
+    const totInspC = sum(filteredF2,'total_containers'), totPosC = sum(filteredF2,'total_positive');
+    const posRate = totInspC ? (totPosC/totInspC*100).toFixed(1) : 0;
+    setNote('chartContainers', totInspC
+      ? `🪣 ${posRate}% of all inspected containers were positive for larvae/pupae overall.`
+      : 'No container data for current filters.');
+  }
 
   // Container type breakdown (%) — >10L vs <10L vs Discards, pooled across
   // the current filtered view
@@ -2040,6 +2206,14 @@ function renderLarvalCharts() {
         }}}
       }}
   });
+  {
+    const typeTot = typeLarge+typeSmall+typeDiscard;
+    const maxT = Math.max(typeLarge,typeSmall,typeDiscard);
+    const domType = typeTot ? (maxT===typeLarge?'>10L containers':(maxT===typeSmall?'<10L jars/vases':'discards')) : 'n/a';
+    setNote('chartContainerTypePie', typeTot
+      ? `🪣 ${domType} make up the largest share of all containers inspected (${(maxT/typeTot*100).toFixed(1)}%).`
+      : 'No container data for current filters.');
+  }
 }
 
 // ── PROKOPACK CHARTS ───────────────────────────────────────────────────────
@@ -2054,6 +2228,13 @@ function renderProkCharts() {
       barDS('Culex sp.',vils.map(v=>sum(byVil[v],'prok_culex')),'#F8BE3D','s')]},
     options:{...baseOpts(),scales:{x:{stacked:true,ticks:{font:{size:10}}},y:{stacked:true,beginAtZero:true,ticks:{font:{size:10}}}}}
   });
+  {
+    const aegShare = vils.map(v=>{ const t=sum(byVil[v],'prok_adults_total'); return t? sum(byVil[v],'prok_aeg_total')/t*100 : 0; });
+    const topS = aegShare.length ? aegShare.indexOf(Math.max(...aegShare)) : -1;
+    setNote('chartProkStack', vils.length
+      ? `🦟 ${villageLabel(vils[topS])} has the highest Ae. aegypti share of Prokopack catch (${aegShare[topS].toFixed(1)}%).`
+      : 'No Prokopack data for current filters.');
+  }
 
   const aegPcts = vils.map(v=>{
     const rows = byVil[v].filter(r=>r.prok_adults_total>0);
@@ -2064,6 +2245,12 @@ function renderProkCharts() {
       backgroundColor:aegPcts.map(v=>'#159895DD'),borderColor:'#159895',borderWidth:1}]},
     options:baseOpts()
   });
+  {
+    const topA = aegPcts.length ? aegPcts.indexOf(Math.max(...aegPcts)) : -1;
+    setNote('chartProkAegPct', vils.length
+      ? `📊 ${villageLabel(vils[topA])} shows the highest Ae. aegypti proportion (${aegPcts[topA]}%) of Prokopack adults.`
+      : 'No Prokopack data for current filters.');
+  }
 
   makeChart('chartProkFM',{type:'bar',
     data:{labels:vils.map(v=>villageLabel(v)),datasets:[
@@ -2071,6 +2258,14 @@ function renderProkCharts() {
       barDS('Male',  vils.map(v=>sum(byVil[v],'prok_aeg_male')),  '#3E6680')]},
     options:baseOpts()
   });
+  {
+    const totF=sum(filteredF3,'prok_aeg_female'), totM=sum(filteredF3,'prok_aeg_male');
+    const totFM=totF+totM;
+    const fPct = totFM ? (totF/totFM*100).toFixed(1) : 0;
+    setNote('chartProkFM', totFM
+      ? `⚖️ Females — the biting, disease-transmitting sex — make up ${fPct}% of Ae. aegypti adults collected.`
+      : 'No Ae. aegypti adults recorded for current filters.');
+  }
 
   const aeAeg = sum(filteredF3,'prok_aeg_total');
   const aeAlb = sum(filteredF3,'prok_alb_total');
@@ -2090,6 +2285,13 @@ function renderProkCharts() {
       }
     }
   });
+  {
+    const totD = aeAeg+aeAlb+culex;
+    const aegPctD = totD ? (aeAeg/totD*100).toFixed(1) : 0;
+    setNote('chartProkDoughnut', totD
+      ? `🍩 Ae. aegypti accounts for ${aegPctD}% of all Prokopack-collected adults.`
+      : 'No Prokopack data for current filters.');
+  }
 }
 
 // ── BG CHARTS ──────────────────────────────────────────────────────────────
@@ -2104,6 +2306,13 @@ function renderBGCharts() {
       barDS('Culex sp.',vils.map(v=>sum(byVil[v],'bg_culex_total')),'#F8BE3D','s')]},
     options:{...baseOpts(),scales:{x:{stacked:true,ticks:{font:{size:10}}},y:{stacked:true,beginAtZero:true,ticks:{font:{size:10}}}}}
   });
+  {
+    const bgAegShare = vils.map(v=>{ const t=sum(byVil[v],'bg_aeg_total')+sum(byVil[v],'bg_alb_total')+sum(byVil[v],'bg_culex_total'); return t? sum(byVil[v],'bg_aeg_total')/t*100 : 0; });
+    const topBG = bgAegShare.length ? bgAegShare.indexOf(Math.max(...bgAegShare)) : -1;
+    setNote('chartBGStack', vils.length
+      ? `🕷️ ${villageLabel(vils[topBG])} has the highest Ae. aegypti share of BG-Sentinel catch (${bgAegShare[topBG].toFixed(1)}%).`
+      : 'No BG-Sentinel data for current filters.');
+  }
 
   makeChart('chartBGInOut',{type:'bar',
     data:{labels:vils.map(v=>villageLabel(v)),datasets:[
@@ -2111,6 +2320,15 @@ function renderBGCharts() {
       barDS('Outdoor',vils.map(v=>sum(byVil[v],'bg_aeg_female_out')+sum(byVil[v],'bg_aeg_male_out')+sum(byVil[v],'bg_alb_female_out')+sum(byVil[v],'bg_alb_male_out')+sum(byVil[v],'bg_culex_out')),'#F8BE3D')]},
     options:baseOpts()
   });
+  {
+    const inTot = sum(filteredF3,'bg_aeg_f_in')+sum(filteredF3,'bg_aeg_m_in')+sum(filteredF3,'bg_alb_f_in')+sum(filteredF3,'bg_alb_m_in')+sum(filteredF3,'bg_culex_in');
+    const outTot = sum(filteredF3,'bg_aeg_f_out')+sum(filteredF3,'bg_aeg_m_out')+sum(filteredF3,'bg_alb_f_out')+sum(filteredF3,'bg_alb_m_out')+sum(filteredF3,'bg_culex_out');
+    const bgTot = inTot+outTot;
+    const inPct = bgTot ? (inTot/bgTot*100).toFixed(1) : 0;
+    setNote('chartBGInOut', bgTot
+      ? `🏠 ${inPct}% of BG-Sentinel catch was collected indoors — relevant for targeting indoor vector control.`
+      : 'No BG-Sentinel data for current filters.');
+  }
 }
 
 // ── OVITRAP CHARTS ─────────────────────────────────────────────────────────
@@ -2124,6 +2342,13 @@ function renderOviCharts() {
       barDS('Outdoor',vils.map(v=>sum(byVil[v],'ovi_eggs_outdoor')),'#F8BE3D')]},
     options:baseOpts()
   });
+  {
+    const oviTotals = vils.map(v=>sum(byVil[v],'ovi_eggs_indoor')+sum(byVil[v],'ovi_eggs_outdoor'));
+    const topO = oviTotals.length ? oviTotals.indexOf(Math.max(...oviTotals)) : -1;
+    setNote('chartOviVillage', vils.length
+      ? `🥚 ${villageLabel(vils[topO])} recorded the most ovitrap eggs (${oviTotals[topO]}) — a strong early signal of oviposition pressure.`
+      : 'No ovitrap data for current filters.');
+  }
 
   const totalIn  = sum(filteredF3,'ovi_eggs_indoor');
   const totalOut = sum(filteredF3,'ovi_eggs_outdoor');
@@ -2132,6 +2357,13 @@ function renderOviCharts() {
       datasets:[{data:[totalIn,totalOut],backgroundColor:['#159895DD','#F8BE3DDD'],borderWidth:2}]},
     options:{responsive:true,maintainAspectRatio:true,plugins:{title:scopeTitlePlugin(),legend:{position:'bottom',labels:{font:{size:11},boxWidth:12}}}}
   });
+  {
+    const oviTot = totalIn+totalOut;
+    const inOviPct = oviTot ? (totalIn/oviTot*100).toFixed(1) : 0;
+    setNote('chartOviPie', oviTot
+      ? `🥚 ${inOviPct}% of ovitrap eggs were laid indoors.`
+      : 'No ovitrap eggs recorded for current filters.');
+  }
 }
 
 // ── TABLE ──────────────────────────────────────────────────────────────────
@@ -2722,6 +2954,15 @@ function renderContainerCharts() {
         title:{display:true,text:'Container Index (%)',font:{size:10}}}}
     }
   });
+  {
+    const highCount = ciVals.filter(v=>v>=20).length;
+    const topIdx = ciVals.length ? ciVals.indexOf(Math.max(...ciVals)) : -1;
+    setNote('chartCI3', ciVals.length
+      ? (highCount>0
+        ? `⚠️ ${highCount} of ${vils.length} village(s) are at/above the WHO 20% CI threshold. Highest: ${villageLabel(vils[topIdx])} at ${ciVals[topIdx]}%.`
+        : `✅ All ${vils.length} villages are below the WHO 20% CI threshold.`)
+      : 'No container index data for current filters.');
+  }
 
   // Container type breakdown — Inspected (%): what fraction of ALL containers
   // looked at were each type
@@ -2742,6 +2983,14 @@ function renderContainerCharts() {
         }}}
       }}
   });
+  {
+    const typeTot = typeLarge+typeSmall+typeDiscard;
+    const maxT = Math.max(typeLarge,typeSmall,typeDiscard);
+    const domType = typeTot ? (maxT===typeLarge?'>10L containers':(maxT===typeSmall?'<10L jars/vases':'discards')) : 'n/a';
+    setNote('chartTypeInspectedPie', typeTot
+      ? `🔍 ${domType} are what field teams find most often (${(maxT/typeTot*100).toFixed(1)}% of all inspected containers).`
+      : 'No container data for current filters.');
+  }
 
   // Container type breakdown — Positive ONLY (%): of containers that tested
   // positive, what fraction were each type. This answers a different
@@ -2766,12 +3015,20 @@ function renderContainerCharts() {
         }}}
       }}
   });
+  {
+    const posTot = typeLargePos+typeSmallPos+typeDiscardPos;
+    const maxP = Math.max(typeLargePos,typeSmallPos,typeDiscardPos);
+    const domPos = posTot ? (maxP===typeLargePos?'>10L containers':(maxP===typeSmallPos?'<10L jars/vases':'discards')) : 'n/a';
+    setNote('chartTypePositivePie', posTot
+      ? `🚩 ${domPos} account for the largest share of positive containers (${(maxP/posTot*100).toFixed(1)}%) — the highest-risk type to target.`
+      : 'No positive containers recorded for current filters.');
+  }
 
   // Individual container type charts
-  for (const [cid, numK, posK, color, posColor] of [
-    ['chartLarge',   'num_large',   'pos_large',   '#159895','#F4837A'],
-    ['chartSmall',   'num_small',   'pos_small',   '#9DDBD5','#E2624F'],
-    ['chartDiscards','num_discards','pos_discards', '#F8BE3D','#B33A2C'],
+  for (const [cid, numK, posK, color, posColor, label] of [
+    ['chartLarge',   'num_large',   'pos_large',   '#159895','#F4837A','Large containers (>10L)'],
+    ['chartSmall',   'num_small',   'pos_small',   '#9DDBD5','#E2624F','Small jars/vases (<10L)'],
+    ['chartDiscards','num_discards','pos_discards', '#F8BE3D','#B33A2C','Discards'],
   ]) {
     makeChart(cid,{type:'bar',
       data:{labels:vils.map(v=>villageLabel(v)), datasets:[
@@ -2780,6 +3037,11 @@ function renderContainerCharts() {
       ]},
       options:baseOpts()
     });
+    const totInspType = sum(f2,numK), totPosType = sum(f2,posK);
+    const posRateType = totInspType ? (totPosType/totInspType*100).toFixed(1) : 0;
+    setNote(cid, totInspType
+      ? `🪣 ${posRateType}% of ${label.toLowerCase()} inspected were positive.`
+      : `No ${label.toLowerCase()} inspected for current filters.`);
   }
 
   // Detail table
