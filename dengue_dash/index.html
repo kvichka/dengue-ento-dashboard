@@ -59,6 +59,9 @@ tr:hover td{background:#f8fafb;}
 .caveat{background:#fff8e6;border:1px solid #f0dca0;color:#7a5c00;border-radius:8px;padding:10px 14px;font-size:12px;margin-bottom:var(--gap);}
 #map{height:520px;border-radius:var(--radius);}
 .legend-box{background:var(--bg-card);border-radius:var(--radius);padding:14px 18px;margin-top:12px;font-size:12px;display:flex;gap:20px;flex-wrap:wrap;box-shadow:0 1px 3px rgba(0,0,0,.07);}
+.prov-label-tooltip{background:transparent;border:none;box-shadow:none;padding:0;}
+.prov-label-tooltip::before{display:none;}
+.prov-label{font-size:8px;line-height:1.1;text-align:center;color:#1c2b33;white-space:nowrap;font-weight:600;text-shadow:0 0 3px #fff,0 0 3px #fff,0 0 3px #fff,0 0 3px #fff;}
 .legend-item{display:flex;align-items:center;gap:6px;}
 .dot{width:11px;height:11px;border-radius:50%;display:inline-block;}
 footer{text-align:center;font-size:11px;color:var(--text-secondary);padding:18px 0;}
@@ -147,7 +150,14 @@ footer{text-align:center;font-size:11px;color:var(--text-secondary);padding:18px
       <div class="card" style="margin-bottom:var(--gap);">
         <h3>National Case &amp; Death Trend — 2018 to 2026</h3>
         <div class="note">Full calendar-year totals 2018-2025 (historical line-list) · 2026 is year-to-date, not a full year — read the bar height accordingly. Bars = cases (left axis), line = deaths (right axis, drawn in front).</div>
+        <div class="filter-row">
+          <label>Province:</label>
+          <select id="trend-yearly-province-select"><option value="__ALL__">All Cambodia</option></select>
+          <label>Years:</label>
+          <div id="trend-yearly-year-dropdown"></div>
+        </div>
         <div style="height:320px;"><canvas id="chart-trend-yearly"></canvas></div>
+        <div class="note chart-note" id="trend-yearly-note" style="margin-top:8px;"></div>
       </div>
       <div class="grid2">
         <div class="card">
@@ -187,9 +197,9 @@ footer{text-align:center;font-size:11px;color:var(--text-secondary);padding:18px
         <div class="note">Incidence Rate (cases per 100,000 population) by province, choropleth-style. Color scale is fixed across all years so you can compare outbreak intensity year to year — not just rank within one year. Population per year (2018-2025) is extrapolated from the 2026 official figure using the source's own Census2019 × 1.024/year growth rate. Markers show Provincial Referral Hospitals and the one National Hospital with usable coordinates in the facility list — 3 National Hospitals in the source data have no coordinates and can't be plotted.</div>
         <div class="filter-row">
           <label>Year:</label>
-          <select id="ir-map-year"></select>
+          <div id="ir-map-year-dropdown"></div>
         </div>
-        <div id="ir-risk-map" style="height:560px;border-radius:var(--radius);margin-top:8px;"></div>
+        <div id="ir-risk-map" style="height:560px;border-radius:var(--radius);margin-top:8px;background:#eaf2f5;"></div>
         <div class="legend-box" id="ir-map-legend"></div>
         <div class="note chart-note" id="ir-map-note" style="margin-top:8px;"></div>
       </div>
@@ -297,7 +307,6 @@ footer{text-align:center;font-size:11px;color:var(--text-secondary);padding:18px
     </div>
   </div>
 
-  <footer>Built from BTB Surveillance line-list (W1-27, 2026), national DHF weekly report, and MIS villages master list · Internal analytical tool, not for public distribution</footer>
 </div>
 
 <script>
@@ -333,6 +342,40 @@ function buildYearDropdown(containerId, years, defaultSelectedYears, onChange){
   container.appendChild(wrap);
   updateLabel();
   return { getSelected };
+}
+
+// Same look as buildYearDropdown, but picks exactly one value at a time (for the map, which can
+// only render one year's colors at once, unlike the multi-year line/bar charts).
+function buildSingleSelectDropdown(containerId, options, defaultValue, onChange){
+  const container = document.getElementById(containerId);
+  const wrap = document.createElement('div'); wrap.className = 'msdd-wrap';
+  const btn = document.createElement('button'); btn.type = 'button'; btn.className = 'msdd-btn';
+  const panel = document.createElement('div'); panel.className = 'msdd-panel';
+  let current = defaultValue;
+  function labelFor(v){ return options.find(o=>o.value===v)?.label ?? v; }
+  function updateLabel(){ btn.textContent = labelFor(current); }
+  function render(){
+    panel.innerHTML = '';
+    options.forEach(opt=>{
+      const item = document.createElement('div'); item.className = 'msdd-item';
+      item.style.cursor = 'pointer';
+      item.textContent = opt.label;
+      if(opt.value === current){ item.style.fontWeight = '700'; item.style.color = 'var(--accent)'; }
+      item.addEventListener('click', ()=>{
+        current = opt.value;
+        updateLabel(); render();
+        panel.classList.remove('open');
+        onChange(current);
+      });
+      panel.appendChild(item);
+    });
+  }
+  btn.addEventListener('click', (e)=>{ e.stopPropagation(); panel.classList.toggle('open'); });
+  document.addEventListener('click', (e)=>{ if(!wrap.contains(e.target)) panel.classList.remove('open'); });
+  wrap.appendChild(btn); wrap.appendChild(panel);
+  container.appendChild(wrap);
+  render(); updateLabel();
+  return { getValue: ()=>current };
 }
 
 
@@ -564,20 +607,52 @@ function renderNational(){
   else epiNoteText = `Every reported 2026 month has stayed within the normal historical range (green zone).`;
   document.getElementById('epidemic-channel-note').textContent = epiNoteText;
 
-  // ---- Yearly national trend (2018-2026), brought back ----
-  new Chart(document.getElementById('chart-trend-yearly'), {
-    data:{ labels: myr.national_yearly.map(y=> y.year===2026 ? '2026 (YTD)' : String(y.year)),
-      datasets:[
-        {type:'bar', label:'Cases', data: myr.national_yearly.map(y=>y.cases), backgroundColor: myr.national_yearly.map(y=>y.year===2026?COLORS[6]:COLORS[0]), yAxisID:'y', order:2, pointStyle:'rect'},
-        {type:'line', label:'Deaths', data: myr.national_yearly.map(y=>y.deaths), borderColor: COLORS[3], backgroundColor: COLORS[3], yAxisID:'y1', tension:.3, pointRadius:4, borderWidth:3, order:1, pointStyle:'line'}
-      ]},
-    options:{ responsive:true, maintainAspectRatio:false, plugins:{legend:{position:'top', labels:{usePointStyle:true}}},
-      scales:{
-        y:{ beginAtZero:true, position:'left', title:{display:true, text:'Cases'} },
-        y1:{ beginAtZero:true, position:'right', title:{display:true, text:'Deaths'}, grid:{drawOnChartArea:false}, ticks:{precision:0} }
-      }
-    }
+  // ---- Yearly national trend (2018-2026), brought back — now filterable by province + years ----
+  const trendYearlyProvSelect = document.getElementById('trend-yearly-province-select');
+  Object.keys(myr.province_series).sort().forEach(p=>{
+    const opt = document.createElement('option'); opt.value = p; opt.textContent = p;
+    trendYearlyProvSelect.appendChild(opt);
   });
+  const allYearlyYears = myr.national_yearly.map(y=>y.year);
+  const trendYearlyYearDD = buildYearDropdown('trend-yearly-year-dropdown', allYearlyYears, allYearlyYears, ()=>renderYearlyTrend());
+
+  let yearlyTrendChart = null;
+  function renderYearlyTrend(){
+    const prov = trendYearlyProvSelect.value;
+    const selectedYears = trendYearlyYearDD.getSelected();
+    let rows;
+    if(prov === '__ALL__'){
+      rows = myr.national_yearly.filter(y=>selectedYears.includes(y.year));
+    } else {
+      const series = myr.province_series[prov];
+      rows = selectedYears.map(y=>({
+        year: y,
+        cases: (series && series.cases[String(y)]) || 0,
+        deaths: (series && series.deaths[String(y)]) || 0
+      }));
+    }
+    if(yearlyTrendChart) yearlyTrendChart.destroy();
+    yearlyTrendChart = new Chart(document.getElementById('chart-trend-yearly'), {
+      data:{ labels: rows.map(y=> y.year===2026 ? '2026 (YTD)' : String(y.year)),
+        datasets:[
+          {type:'bar', label:'Cases', data: rows.map(y=>y.cases), backgroundColor: rows.map(y=>y.year===2026?COLORS[6]:COLORS[0]), yAxisID:'y', order:2, pointStyle:'rect'},
+          {type:'line', label:'Deaths', data: rows.map(y=>y.deaths), borderColor: COLORS[3], backgroundColor: COLORS[3], yAxisID:'y1', tension:.3, pointRadius:4, borderWidth:3, order:1, pointStyle:'line'}
+        ]},
+      options:{ responsive:true, maintainAspectRatio:false, plugins:{legend:{position:'top', labels:{usePointStyle:true}}},
+        scales:{
+          y:{ beginAtZero:true, position:'left', title:{display:true, text:'Cases'} },
+          y1:{ beginAtZero:true, position:'right', title:{display:true, text:'Deaths'}, grid:{drawOnChartArea:false}, ticks:{precision:0} }
+        }
+      }
+    });
+    const peak = [...rows].sort((a,b)=>b.cases-a.cases)[0];
+    const scopeLabel = prov === '__ALL__' ? 'Cambodia' : prov;
+    document.getElementById('trend-yearly-note').textContent = peak
+      ? `${scopeLabel}: highest year shown is ${peak.year===2026?'2026 (YTD)':peak.year} with ${fmt(peak.cases)} cases and ${fmt(peak.deaths)} deaths.`
+      : 'No years selected.';
+  }
+  trendYearlyProvSelect.addEventListener('change', renderYearlyTrend);
+  renderYearlyTrend();
 
   // ---- Continuous monthly severity timeline, Vietnam-style (2018-2025 full mix; 2026 totals only), filterable by province + year ----
   const sevNational = BUNDLE.monthly_severity;
@@ -669,12 +744,8 @@ function renderNational(){
   const irData = BUNDLE.ir_heatmap;
   const geoData = BUNDLE.cambodia_geo;
   const keyFacilities = BUNDLE.key_facilities;
-  const irMapYearSelect = document.getElementById('ir-map-year');
-  irData.years.forEach(y=>{
-    const opt = document.createElement('option'); opt.value = y; opt.textContent = (y===2026 ? '2026 (YTD)' : y);
-    if(y===2026) opt.selected = true;
-    irMapYearSelect.appendChild(opt);
-  });
+  const irMapYearOptions = irData.years.map(y=>({ value: String(y), label: y===2026 ? '2026 (YTD)' : String(y) }));
+  const irMapYearDD = buildSingleSelectDropdown('ir-map-year-dropdown', irMapYearOptions, '2026', ()=>renderRiskMap());
 
   // GeoJSON feature province name -> our canonical province name
   const GEO_NAME_MAP = {
@@ -709,12 +780,11 @@ function renderNational(){
 
   let riskMap = null, geoLayer = null;
   function renderRiskMap(){
-    const y = irMapYearSelect.value;
+    const y = irMapYearDD.getValue();
     if(!riskMap){
-      riskMap = L.map('ir-risk-map', {scrollWheelZoom:false}).setView([12.6, 104.9], 7);
-      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-        attribution:'© OpenStreetMap contributors', maxZoom:10, minZoom:6
-      }).addTo(riskMap);
+      riskMap = L.map('ir-risk-map', {scrollWheelZoom:true, attributionControl:false, minZoom:5, maxZoom:12}).setView([12.6, 104.9], 7);
+      // No basemap tiles here on purpose — just the province polygons on a plain background,
+      // since street/place names weren't needed for a province-level choropleth.
     }
     if(geoLayer) riskMap.removeLayer(geoLayer);
     geoLayer = L.geoJSON(geoData, {
@@ -726,7 +796,10 @@ function renderNational(){
       onEachFeature: (feature, layer) => {
         const provName = GEO_NAME_MAP[feature.properties.name] || feature.properties.name;
         const ir = irData.ir_by_province_year[provName] ? (irData.ir_by_province_year[provName][y] ?? null) : null;
-        layer.bindTooltip(`<b>${provName}</b><br>IR: ${ir!=null ? ir.toFixed(1) : 'n/a'} per 100,000`, {sticky:true});
+        const irLabel = ir!=null ? ir.toFixed(1) : 'n/a';
+        layer.bindTooltip(`<div class="prov-label"><b>${provName}</b><br>IR: ${irLabel}</div>`, {
+          permanent:true, direction:'center', className:'prov-label-tooltip', interactive:false
+        });
       }
     }).addTo(riskMap);
 
@@ -755,7 +828,6 @@ function renderNational(){
       mapNote.textContent = `Highest IR in ${yearLabel}: ${top.province}, ${top.ir.toFixed(1)} per 100,000. Lowest: ${irEntries[irEntries.length-1].province}, ${irEntries[irEntries.length-1].ir.toFixed(1)} per 100,000.`;
     }
   }
-  irMapYearSelect.addEventListener('change', renderRiskMap);
   window._renderRiskMap = renderRiskMap;
   window._riskMapGetInstance = () => riskMap;
 
