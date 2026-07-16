@@ -2229,11 +2229,24 @@ function renderProkCharts() {
     options:{...baseOpts(),scales:{x:{stacked:true,ticks:{font:{size:10}}},y:{stacked:true,beginAtZero:true,ticks:{font:{size:10}}}}}
   });
   {
-    const aegShare = vils.map(v=>{ const t=sum(byVil[v],'prok_adults_total'); return t? sum(byVil[v],'prok_aeg_total')/t*100 : 0; });
-    const topS = aegShare.length ? aegShare.indexOf(Math.max(...aegShare)) : -1;
-    setNote('chartProkStack', vils.length
-      ? `🦟 ${villageLabel(vils[topS])} has the highest Ae. aegypti share of Prokopack catch (${aegShare[topS].toFixed(1)}%).`
-      : 'No Prokopack data for current filters.');
+    const aegVals = vils.map(v=>sum(byVil[v],'prok_aeg_total'));
+    const albVals = vils.map(v=>sum(byVil[v],'prok_alb_total'));
+    const culexVals = vils.map(v=>sum(byVil[v],'prok_culex'));
+    const totals = vils.map((v,i)=>aegVals[i]+albVals[i]+culexVals[i]);
+    const topV = totals.length ? totals.indexOf(Math.max(...totals)) : -1;
+    if (topV >= 0 && totals[topV] > 0) {
+      const counts = [
+        {label:'Ae. aegypti', n:aegVals[topV]},
+        {label:'Ae. albopictus', n:albVals[topV]},
+        {label:'Culex sp.', n:culexVals[topV]},
+      ];
+      const dom = counts.reduce((a,b)=> b.n>a.n ? b : a, counts[0]);
+      const domPct = (dom.n/totals[topV]*100).toFixed(1);
+      setNote('chartProkStack',
+        `🦟 ${villageLabel(vils[topV])} recorded the highest total Prokopack catch (${totals[topV]} adults), dominated by ${dom.label} (${dom.n}, ${domPct}%).`);
+    } else {
+      setNote('chartProkStack', 'No Prokopack data for current filters.');
+    }
   }
 
   const aegPcts = vils.map(v=>{
