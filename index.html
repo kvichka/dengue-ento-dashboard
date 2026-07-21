@@ -136,6 +136,13 @@ tbody tr:hover{background:#f8f9fa}
 tfoot td{padding:9px 10px;font-weight:700;background:#EFF6FF;border-top:2px solid var(--blue);
   color:#1A2332;white-space:nowrap}
 tfoot tr:hover{background:#EFF6FF}
+.ind-table thead th{background:var(--blue);color:#fff;border-bottom:none;text-transform:none;letter-spacing:0;cursor:default}
+.ind-table thead th:hover{background:var(--blue);color:#fff}
+.ind-table thead th:first-child{border-radius:6px 0 0 0}
+.ind-table thead th:last-child{border-radius:0 6px 0 0}
+.ind-table tbody td{white-space:normal}
+.ind-table td.val{text-align:right;font-weight:700;color:#1A2332}
+.ind-table tr.hl td{font-weight:700;background:#F8FAFC}
 .badge{display:inline-block;padding:2px 8px;border-radius:10px;font-size:12px;font-weight:600}
 .badge-high{background:#FDEBD7;color:#C44028}
 .badge-mid{background:#FEF9E0;color:#B8860B}
@@ -340,6 +347,34 @@ footer{text-align:center;font-size:12px;color:var(--grey);padding:16px;margin-to
       <div class="kpi-val" id="kpi-ovi">—</div>
       <div class="kpi-sub" id="kpi-ovi-sub">indoor + outdoor</div>
       <div class="kpi-sub" id="kpi-ovi-delta"></div>
+    </div>
+  </div>
+  <div class="chart-grid">
+    <div class="chart-box">
+      <h3><span>🦟</span> <span data-i18n-chart="tableAdultIndicators">Adult Survey Indicators</span></h3>
+      <table class="ind-table">
+        <thead><tr><th data-i18n="col_indicator">Indicator</th><th style="text-align:right" data-i18n="col_pct">%</th></tr></thead>
+        <tbody>
+          <tr><td data-i18n="ind_species_aeg">Species — Ae. aegypti</td><td class="val" id="ind-adult-aeg">—</td></tr>
+          <tr><td data-i18n="ind_species_alb">Species — Ae. albopictus</td><td class="val" id="ind-adult-alb">—</td></tr>
+          <tr><td data-i18n="ind_species_culex">Species — Culex</td><td class="val" id="ind-adult-culex">—</td></tr>
+          <tr class="hl"><td data-i18n="ind_female_aeg">Female Ae. aegypti</td><td class="val" id="ind-adult-faeg">—</td></tr>
+          <tr><td data-i18n="ind_female_alb">Female Ae. albopictus</td><td class="val" id="ind-adult-falb">—</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="chart-box">
+      <h3><span>🔬</span> <span data-i18n-chart="tableLarvalIndicators">Larval Survey Indicators</span></h3>
+      <table class="ind-table">
+        <thead><tr><th data-i18n="col_indicator">Indicator</th><th style="text-align:right" data-i18n="col_pct">%</th></tr></thead>
+        <tbody>
+          <tr class="hl"><td data-i18n="ind_ci">Container Index (CI)</td><td class="val" id="ind-larv-ci">—</td></tr>
+          <tr class="hl"><td data-i18n="ind_hi">House Index (HI)</td><td class="val" id="ind-larv-hi">—</td></tr>
+          <tr><td data-i18n="ind_species_aeg">Species — Ae. aegypti</td><td class="val" id="ind-larv-aeg">—</td></tr>
+          <tr><td data-i18n="ind_species_alb">Species — Ae. albopictus</td><td class="val" id="ind-larv-alb">—</td></tr>
+          <tr><td data-i18n="ind_species_culex">Species — Culex</td><td class="val" id="ind-larv-culex">—</td></tr>
+        </tbody>
+      </table>
     </div>
   </div>
   <div class="chart-grid">
@@ -948,6 +983,23 @@ const I18N = {
   misc_no_change: { en: 'no change vs prev.', km: 'គ្មានការផ្លាស់ប្តូរ ធៀបនឹងមុន' },
   misc_vs_prev: { en: 'vs prev.', km: 'ធៀបនឹងមុន' },
   misc_village_s: { en: 'village(s)', km: 'ភូមិ' },
+  // NOTE: tableAdultIndicators / tableLarvalIndicators / ind_hi are new compound
+  // phrases not present in the team's Khmer_Translation_Reference.xlsx — flagged
+  // for native-speaker/entomology-team review before wide distribution, same as
+  // other unreviewed strings in this file. All other keys below reuse wording
+  // already verified in that reference file (ប្រភេទ=Species, ញី=Female,
+  // ពេញវ័យ=Adult, សន្ទស្សន៍ធុង=Container Index, ដង្កូវទឹក=Larvae).
+  tableAdultIndicators: { en: 'Adult Survey Indicators', km: 'សូចនាករអង្កេតសត្វមូសពេញវ័យ' },
+  tableLarvalIndicators: { en: 'Larval Survey Indicators', km: 'សូចនាករអង្កេតដង្កូវទឹក' },
+  col_indicator: { en: 'Indicator', km: 'សូចនាករ' },
+  col_pct: { en: '%', km: '%' },
+  ind_species_aeg: { en: 'Species — Ae. aegypti', km: 'ប្រភេទ — Ae. aegypti' },
+  ind_species_alb: { en: 'Species — Ae. albopictus', km: 'ប្រភេទ — Ae. albopictus' },
+  ind_species_culex: { en: 'Species — Culex', km: 'ប្រភេទ — Culex' },
+  ind_female_aeg: { en: 'Female Ae. aegypti', km: 'ញី Ae. aegypti' },
+  ind_female_alb: { en: 'Female Ae. albopictus', km: 'ញី Ae. albopictus' },
+  ind_ci: { en: 'Container Index (CI)', km: 'សន្ទស្សន៍ធុង (CI)' },
+  ind_hi: { en: 'House Index (HI)', km: 'សន្ទស្សន៍ផ្ទះ (HI)' },
   word_low: { en: 'Low', km: 'ទាប' },
   word_medium: { en: 'Medium', km: 'មធ្យម' },
   word_high: { en: 'High', km: 'ខ្ពស់' },
@@ -1959,6 +2011,23 @@ function renderKPIs() {
   document.getElementById('kpi-ovi').textContent = fmt(ovi);
   document.getElementById('kpi-ovi-sub').textContent = `Indoor: ${nf(oviIn)}  Outdoor: ${nf(oviOut)}`;
   renderPeriodComparison();
+
+  // Adult & Larval Survey Indicator summary tables
+  const pctOf = (n,d) => d>0 ? (n/d*100).toFixed(1)+'%' : '—';
+  const prokAegFemale = sum(filteredF3,'prok_aeg_female');
+  const prokAlbFemale = sum(filteredF3,'prok_alb_female');
+  document.getElementById('ind-adult-aeg').textContent   = pctOf(prokAeg, prok);
+  document.getElementById('ind-adult-alb').textContent   = pctOf(prokAlb, prok);
+  document.getElementById('ind-adult-culex').textContent = pctOf(prokCulex, prok);
+  document.getElementById('ind-adult-faeg').textContent  = pctOf(prokAegFemale, prokAeg);
+  document.getElementById('ind-adult-falb').textContent  = pctOf(prokAlbFemale, prokAlb);
+
+  const larvAegSum = sum(filteredF3,'larv_aeg'), larvAlbSum = sum(filteredF3,'larv_alb'), larvCulexSum = sum(filteredF3,'larv_culex');
+  document.getElementById('ind-larv-ci').textContent    = ci.toFixed(1)+'%';
+  document.getElementById('ind-larv-hi').textContent    = hi.toFixed(1)+'%';
+  document.getElementById('ind-larv-aeg').textContent   = pctOf(larvAegSum, larv);
+  document.getElementById('ind-larv-alb').textContent   = pctOf(larvAlbSum, larv);
+  document.getElementById('ind-larv-culex').textContent = pctOf(larvCulexSum, larv);
 
   
   // Larval KPIs
